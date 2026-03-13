@@ -1,0 +1,23 @@
+{
+  "runtime": "Net80",
+  "documentGenerator": {
+    "aspNetCoreToOpenApi": {
+      "project": "B2BSpareParts.Api.csproj",
+      "documentName": "v1",
+      "output": "../../generated/openapi.json",
+      "noBuild": false
+    }
+  },
+  "codeGenerators": {
+    "openApiToTypeScriptClient": {
+      "className": "ApiClient",
+      "template": "Fetch",
+      "typeScriptVersion": 5.4,
+      "generateClientClasses": true,
+      "generateClientInterfaces": false,
+      "markOptionalProperties": true,
+      "generateDtoTypes": true,
+      "output": "../../generated/apiClient.ts"
+    }
+  }
+}

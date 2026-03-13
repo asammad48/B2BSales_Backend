@@ -1,0 +1,53 @@
+using B2BSpareParts.Application.Common;
+using B2BSpareParts.Application.Contracts;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace B2BSpareParts.Api.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class OrdersController : ControllerBase
+{
+    private readonly IOrderService _orderService;
+
+    public OrdersController(IOrderService orderService)
+    {
+        _orderService = orderService;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
+        => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Orders.OrderListItemResponseDto>>.Ok(await _orderService.GetPagedAsync(request, ct)));
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] B2BSpareParts.Application.DTOs.Orders.CreateOrderRequestDto request, CancellationToken ct)
+        => Ok(ApiResponse<Guid>.Ok(await _orderService.CreateAsync(request, ct)));
+
+    [HttpPost("{id:guid}/ready")]
+    public async Task<IActionResult> MarkReady(Guid id, CancellationToken ct)
+    {
+        await _orderService.MarkReadyAsync(id, ct);
+        return Ok(ApiResponse<string>.Ok("Order marked ready"));
+    }
+
+    [HttpPost("{id:guid}/complete")]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken ct)
+    {
+        await _orderService.CompleteAsync(id, ct);
+        return Ok(ApiResponse<string>.Ok("Order completed"));
+    }
+
+    [HttpPost("{id:guid}/unable-to-fulfill")]
+    public async Task<IActionResult> MarkUnableToFulfill(Guid id, [FromBody] UnableToFulfillRequest? request, CancellationToken ct)
+    {
+        await _orderService.MarkUnableToFulfillAsync(id, request?.Reason, ct);
+        return Ok(ApiResponse<string>.Ok("Order marked unable to fulfill"));
+    }
+
+    public sealed class UnableToFulfillRequest
+    {
+        public string? Reason { get; set; }
+    }
+}
