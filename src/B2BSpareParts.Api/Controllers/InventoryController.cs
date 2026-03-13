@@ -19,36 +19,36 @@ public class InventoryController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Inventory.InventoryListItemResponseDto>>>> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Inventory.InventoryListItemResponseDto>>.Ok(await _inventoryService.GetPagedAsync(request, ct)));
 
     [HttpPost("stock-in")]
-    public async Task<IActionResult> StockIn([FromBody] B2BSpareParts.Application.DTOs.Inventory.StockInRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> StockIn([FromBody] B2BSpareParts.Application.DTOs.Inventory.StockInRequestDto request, CancellationToken ct)
     {
         await _inventoryService.StockInAsync(request, ct);
         return Ok(ApiResponse<string>.Ok("Stock added"));
     }
 
     [HttpPost("adjust")]
-    public async Task<IActionResult> Adjust([FromBody] B2BSpareParts.Application.DTOs.Inventory.AdjustStockRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Adjust([FromBody] B2BSpareParts.Application.DTOs.Inventory.AdjustStockRequestDto request, CancellationToken ct)
     {
         await _inventoryService.AdjustAsync(request, ct);
         return Ok(ApiResponse<string>.Ok("Stock adjusted"));
     }
 
     [HttpPost("transfers")]
-    public async Task<IActionResult> CreateTransfer([FromBody] B2BSpareParts.Application.DTOs.Inventory.CreateStockTransferRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<Guid>>> CreateTransfer([FromBody] B2BSpareParts.Application.DTOs.Inventory.CreateStockTransferRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<Guid>.Ok(await _inventoryService.CreateTransferAsync(request, ct)));
 
     [HttpPost("transfers/{id:guid}/dispatch")]
-    public async Task<IActionResult> Dispatch(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Dispatch(Guid id, CancellationToken ct)
     {
         await _inventoryService.DispatchTransferAsync(id, ct);
         return Ok(ApiResponse<string>.Ok("Transfer dispatched"));
     }
 
     [HttpPost("transfers/{id:guid}/receive")]
-    public async Task<IActionResult> Receive(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Receive(Guid id, CancellationToken ct)
     {
         await _inventoryService.ReceiveTransferAsync(id, ct);
         return Ok(ApiResponse<string>.Ok("Transfer received"));

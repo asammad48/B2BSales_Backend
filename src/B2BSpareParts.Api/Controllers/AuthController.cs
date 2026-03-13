@@ -19,12 +19,12 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] B2BSpareParts.Application.DTOs.Auth.LoginRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Auth.LoginResponseDto>>> Login([FromBody] B2BSpareParts.Application.DTOs.Auth.LoginRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Auth.LoginResponseDto>.Ok(await _authService.LoginAsync(request, ct)));
 
     [Authorize]
     [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ChangePasswordRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ChangePasswordRequestDto request, CancellationToken ct)
     {
         await _authService.ChangePasswordAsync(request, ct);
         return Ok(ApiResponse<string>.Ok("Password changed"));
@@ -32,12 +32,12 @@ public class AuthController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("forgot-password")]
-    public async Task<IActionResult> ForgotPassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ForgotPasswordRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Auth.ForgotPasswordResponseDto>>> ForgotPassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ForgotPasswordRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Auth.ForgotPasswordResponseDto>.Ok(await _authService.ForgotPasswordAsync(request, ct)));
 
     [AllowAnonymous]
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ResetPasswordRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> ResetPassword([FromBody] B2BSpareParts.Application.DTOs.Auth.ResetPasswordRequestDto request, CancellationToken ct)
     {
         await _authService.ResetPasswordAsync(request, ct);
         return Ok(ApiResponse<string>.Ok("Password reset"));

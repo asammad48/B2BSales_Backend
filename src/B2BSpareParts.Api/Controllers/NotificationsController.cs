@@ -19,6 +19,6 @@ public class NotificationsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Notifications.NotificationListItemResponseDto>>>> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Notifications.NotificationListItemResponseDto>>.Ok(await _notificationService.GetPagedAsync(request, ct)));
 }

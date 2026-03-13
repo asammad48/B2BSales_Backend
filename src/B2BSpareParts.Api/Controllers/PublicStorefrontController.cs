@@ -23,14 +23,14 @@ public class PublicStorefrontController : ControllerBase
     }
 
     [HttpGet("theme")]
-    public async Task<IActionResult> GetTheme(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<ThemeResponseDto>>> GetTheme(CancellationToken ct)
         => Ok(ApiResponse<ThemeResponseDto>.Ok(await _themeService.GetAsync(ct)));
 
     [HttpGet("products")]
-    public async Task<IActionResult> GetProducts([FromQuery] PageRequest request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PageResponse<ProductListItemResponseDto>>>> GetProducts([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<ProductListItemResponseDto>>.Ok(await _productService.GetPagedAsync(request, true, ct)));
 
     [HttpGet("products/{id:guid}")]
-    public async Task<IActionResult> GetProduct(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<ProductDetailResponseDto>>> GetProduct(Guid id, CancellationToken ct)
         => Ok(ApiResponse<ProductDetailResponseDto>.Ok(await _productService.GetByIdAsync(id, true, ct)));
 }
