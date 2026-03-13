@@ -19,6 +19,6 @@ public class LookupsController : ControllerBase
     }
 
     [HttpGet("bundle")]
-    public async Task<IActionResult> GetBundle(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Lookups.LookupBundleResponseDto>>> GetBundle(CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Lookups.LookupBundleResponseDto>.Ok(await _lookupService.GetBundleAsync(ct)));
 }

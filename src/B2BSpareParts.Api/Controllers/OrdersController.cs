@@ -18,29 +18,29 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Orders.OrderListItemResponseDto>>>> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Orders.OrderListItemResponseDto>>.Ok(await _orderService.GetPagedAsync(request, ct)));
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] B2BSpareParts.Application.DTOs.Orders.CreateOrderRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<Guid>>> Create([FromBody] B2BSpareParts.Application.DTOs.Orders.CreateOrderRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<Guid>.Ok(await _orderService.CreateAsync(request, ct)));
 
     [HttpPost("{id:guid}/ready")]
-    public async Task<IActionResult> MarkReady(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> MarkReady(Guid id, CancellationToken ct)
     {
         await _orderService.MarkReadyAsync(id, ct);
         return Ok(ApiResponse<string>.Ok("Order marked ready"));
     }
 
     [HttpPost("{id:guid}/complete")]
-    public async Task<IActionResult> Complete(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Complete(Guid id, CancellationToken ct)
     {
         await _orderService.CompleteAsync(id, ct);
         return Ok(ApiResponse<string>.Ok("Order completed"));
     }
 
     [HttpPost("{id:guid}/unable-to-fulfill")]
-    public async Task<IActionResult> MarkUnableToFulfill(Guid id, [FromBody] UnableToFulfillRequest? request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> MarkUnableToFulfill(Guid id, [FromBody] UnableToFulfillRequest? request, CancellationToken ct)
     {
         await _orderService.MarkUnableToFulfillAsync(id, request?.Reason, ct);
         return Ok(ApiResponse<string>.Ok("Order marked unable to fulfill"));

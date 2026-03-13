@@ -19,11 +19,11 @@ public class ThemesController : ControllerBase
     }
 
     [HttpGet("current")]
-    public async Task<IActionResult> Get(CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Themes.ThemeResponseDto>>> Get(CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Themes.ThemeResponseDto>.Ok(await _themeService.GetAsync(ct)));
 
     [HttpPut("current")]
-    public async Task<IActionResult> Update([FromBody] B2BSpareParts.Application.DTOs.Themes.UpdateThemeRequestDto request, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Update([FromBody] B2BSpareParts.Application.DTOs.Themes.UpdateThemeRequestDto request, CancellationToken ct)
     {
         await _themeService.UpdateAsync(request, ct);
         return Ok(ApiResponse<string>.Ok("Theme updated"));
