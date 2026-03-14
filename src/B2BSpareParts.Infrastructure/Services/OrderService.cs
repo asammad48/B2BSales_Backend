@@ -24,9 +24,6 @@ public class OrderService : IOrderService
         var tenantId = _tenantContext.TenantId;
         var query = _db.Orders
             .AsNoTracking()
-            .Include(x => x.Shop)
-            .Include(x => x.Client)
-            .Include(x => x.Currency)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -36,6 +33,7 @@ public class OrderService : IOrderService
         }
 
         var projected = query
+            .ApplyCreatedAtSort(request)
             .Select(x => new OrderListItemResponseDto
             {
                 Id = x.Id,
@@ -49,8 +47,7 @@ public class OrderService : IOrderService
                 CurrencyCode = x.Currency!.Code,
                 TotalAmount = x.TotalAmount,
                 CreatedAt = x.CreatedAt
-            })
-            .ApplyCreatedAtSort(request);
+            });
 
         return await projected.ToPageAsync(request, ct);
     }

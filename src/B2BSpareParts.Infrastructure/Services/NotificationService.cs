@@ -28,15 +28,17 @@ public class NotificationService : INotificationService
             query = query.Where(x => x.Title.ToLower().Contains(search) || x.Message.ToLower().Contains(search));
         }
 
-        var projected = query.Select(x => new NotificationListItemResponseDto
-        {
-            Id = x.Id,
-            Type = x.Type.ToString(),
-            Title = x.Title,
-            Message = x.Message,
-            IsRead = x.IsRead,
-            CreatedAt = x.CreatedAt
-        }).ApplyCreatedAtSort(request);
+        var projected = query
+            .ApplyCreatedAtSort(request)
+            .Select(x => new NotificationListItemResponseDto
+            {
+                Id = x.Id,
+                Type = x.Type.ToString(),
+                Title = x.Title,
+                Message = x.Message,
+                IsRead = x.IsRead,
+                CreatedAt = x.CreatedAt
+            });
 
         return await projected.ToPageAsync(request, ct);
     }

@@ -39,7 +39,7 @@ public class UserService : IUserService
     public async Task<PageResponse<UserListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
-        var query = _db.Users.AsNoTracking().Include(x => x.Shop).Where(x => x.TenantId == tenantId && !x.IsDeleted);
+        var query = _db.Users.AsNoTracking().Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -48,6 +48,7 @@ public class UserService : IUserService
         }
 
         var projected = query
+            .OrderBy(x => x.FullName)
             .Select(x => new UserListItemResponseDto
             {
                 Id = x.Id,
@@ -57,8 +58,7 @@ public class UserService : IUserService
                 Email = x.Email,
                 Role = x.Role,
                 IsActive = x.IsActive
-            })
-            .OrderBy(x => x.FullName);
+            });
 
         return await projected.ToPageAsync(request, ct);
     }

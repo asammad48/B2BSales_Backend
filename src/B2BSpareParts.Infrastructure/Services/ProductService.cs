@@ -23,11 +23,6 @@ public class ProductService : IProductService
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
             .AsNoTracking()
-            .Include(x => x.Category)
-            .Include(x => x.Brand)
-            .Include(x => x.Model)
-            .Include(x => x.PartType)
-            .Include(x => x.Images)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -37,6 +32,7 @@ public class ProductService : IProductService
         }
 
         var projected = query
+            .ApplyCreatedAtSort(request)
             .Select(x => new ProductListItemResponseDto
             {
                 Id = x.Id,
@@ -58,8 +54,7 @@ public class ProductService : IProductService
                 IsActive = x.IsActive,
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView
-            })
-            .ApplyCreatedAtSort(request);
+            });
 
         return await projected.ToPageAsync(request, ct);
     }
