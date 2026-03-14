@@ -24,8 +24,10 @@ public class Product : TenantEntity
     public int WarrantyDays { get; set; }
     public int LowStockThreshold { get; set; } = 5;
     public bool IsActive { get; set; } = true;
+    public bool IsPublicVisible { get; set; }
     public bool IsFeatured { get; set; }
 
+    public Tenant? Tenant { get; set; }
     public Category? Category { get; set; }
     public Brand? Brand { get; set; }
     public DeviceModel? Model { get; set; }

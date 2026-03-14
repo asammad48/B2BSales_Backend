@@ -120,7 +120,8 @@ public class DatabaseSeeder
             LongDescription = "A clean serialized device product for demo purposes.",
             Specifications = "128GB / Blue / PTA Approved",
             LowStockThreshold = 2,
-            IsFeatured = true
+            IsFeatured = true,
+            IsPublicVisible = true
         };
         var a50Screen = new Product
         {
@@ -142,7 +143,8 @@ public class DatabaseSeeder
             ShortDescription = "OLED screen for Samsung A50",
             LongDescription = "Demo OLED screen product with quantity stock.",
             Specifications = "OEM / Black / 7 day checking warranty",
-            LowStockThreshold = 10
+            LowStockThreshold = 10,
+            IsPublicVisible = true
         };
         var adhesive = new Product
         {
@@ -163,7 +165,8 @@ public class DatabaseSeeder
             ShortDescription = "Adhesive for A50 screen fitting",
             LongDescription = "Demo accessory product.",
             Specifications = "Single strip adhesive",
-            LowStockThreshold = 20
+            LowStockThreshold = 20,
+            IsPublicVisible = true
         };
 
         _db.Products.AddRange(iphoneProduct, a50Screen, adhesive);

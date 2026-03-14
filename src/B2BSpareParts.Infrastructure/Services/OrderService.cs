@@ -1,6 +1,8 @@
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Orders;
+using B2BSpareParts.Application.DTOs.Orders.ClientOrders;
+using B2BSpareParts.Common;
 using B2BSpareParts.Domain.Entities;
 using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Persistence;
@@ -119,6 +121,93 @@ public class OrderService : IOrderService
         await _db.SaveChangesAsync(ct);
 
         return order.Id;
+    }
+
+    public async Task<PlaceClientOrderResponseDto> PlaceClientOrderAsync(PlaceClientOrderRequestDto request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var userId = _tenantContext.UserId;
+
+        var user = await _db.Users
+            .Include(u => u.Tenant)
+            .FirstOrDefaultAsync(u => u.Id == userId && u.TenantId == tenantId && !u.IsDeleted, ct)
+            ?? throw new AppException("User not found", 404);
+
+        if (user.Role != UserRoles.Client)
+            throw new AppException("Only clients can place orders through this API", 403);
+
+        var client = await _db.Clients.FirstOrDefaultAsync(x => x.Email == user.Email && x.TenantId == tenantId && !x.IsDeleted, ct)
+                     ?? throw new AppException("Client profile not found", 404);
+
+        if (client.Status != ClientStatus.Approved)
+            throw new AppException("Client is not approved", 403);
+
+        if (request.Items == null || request.Items.Count == 0)
+            throw new AppException("Order must have at least one item", 400);
+
+        var productIds = request.Items.Select(i => i.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(x => productIds.Contains(x.Id) && x.TenantId == tenantId && !x.IsDeleted)
+            .ToListAsync(ct);
+
+        var order = new Order
+        {
+            TenantId = tenantId,
+            ShopId = request.ShopId,
+            ClientId = client.Id,
+            CurrencyId = client.PreferredCurrencyId ?? user.Tenant!.BaseCurrencyId,
+            ExchangeRate = 1.0m, // Simplified for now, in real world we'd fetch actual rate
+            OrderNumber = $"ORD-CL-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            Notes = request.Notes,
+            PlacedByUserId = userId,
+            Status = OrderStatus.Pending
+        };
+
+        foreach (var item in request.Items)
+        {
+            var product = products.FirstOrDefault(x => x.Id == item.ProductId)
+                          ?? throw new AppException($"Product {item.ProductId} not found", 404);
+
+            if (!product.IsActive || !product.IsPublicVisible)
+                throw new AppException($"Product {product.Name} is not available for order", 400);
+
+            if (item.Quantity <= 0)
+                throw new AppException($"Quantity for product {product.Name} must be greater than zero", 400);
+
+            // Duplicate product IDs in the request: we could merge them or reject. Re-use existing logic of adding separate items or merging.
+            // Following requirement "reject duplicate product entries or merge them" - let's merge them implicitly by checking if already added.
+            var existingItem = order.Items.FirstOrDefault(i => i.ProductId == item.ProductId);
+            if (existingItem != null)
+            {
+                existingItem.Quantity += item.Quantity;
+                existingItem.LineTotal = existingItem.UnitPrice * existingItem.Quantity;
+            }
+            else
+            {
+                order.Items.Add(new OrderItem
+                {
+                    ProductId = product.Id,
+                    Quantity = item.Quantity,
+                    UnitPrice = product.DefaultSellingPrice,
+                    BaseUnitPrice = product.DefaultSellingPrice,
+                    LineTotal = product.DefaultSellingPrice * item.Quantity
+                });
+            }
+        }
+
+        order.Subtotal = order.Items.Sum(x => x.LineTotal);
+        order.TotalAmount = order.Subtotal + order.TaxAmount - order.DiscountAmount;
+
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync(ct);
+
+        return new PlaceClientOrderResponseDto
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            Status = order.Status.ToString(),
+            Message = "Order placed successfully."
+        };
     }
 
     public async Task MarkReadyAsync(Guid id, CancellationToken ct = default)
