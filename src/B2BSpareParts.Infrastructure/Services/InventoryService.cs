@@ -24,9 +24,6 @@ public class InventoryService : IInventoryService
         var tenantId = _tenantContext.TenantId;
         var query = _db.ShopInventories
             .AsNoTracking()
-            .Include(x => x.Shop)
-            .Include(x => x.Product)!.ThenInclude(x => x.Brand)
-            .Include(x => x.Product)!.ThenInclude(x => x.Model)
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -40,6 +37,7 @@ public class InventoryService : IInventoryService
         }
 
         var projected = query
+            .OrderBy(x => x.Product!.Name)
             .Select(x => new InventoryListItemResponseDto
             {
                 ProductId = x.ProductId,
@@ -57,8 +55,7 @@ public class InventoryService : IInventoryService
                 ReservedQuantity = x.ReservedQuantity,
                 AvailableQuantity = x.QuantityOnHand - x.ReservedQuantity,
                 LowStockThreshold = x.LowStockThreshold
-            })
-            .OrderBy(x => x.ProductName);
+            });
 
         return await projected.ToPageAsync(request, ct);
     }
