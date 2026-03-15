@@ -25,6 +25,11 @@ public class ProductService : IProductService
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && !x.IsDeleted);
 
+        if (isGuestView)
+        {
+            query = query.Where(x => x.IsPublicVisible && x.IsActive);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var search = request.Search.Trim().ToLower();
@@ -49,7 +54,7 @@ public class ProductService : IProductService
                 PartTypeName = x.PartType != null ? x.PartType.Name : null,
                 TrackingType = x.TrackingType,
                 QualityType = x.QualityType,
-                DefaultSellingPrice = isGuestView ? null : x.DefaultSellingPrice,
+                DefaultSellingPrice = x.DefaultSellingPrice,
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 IsActive = x.IsActive,
                 IsPriceLocked = isGuestView,

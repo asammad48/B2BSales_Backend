@@ -25,6 +25,10 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<Guid>>> Create([FromBody] B2BSpareParts.Application.DTOs.Orders.CreateOrderRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<Guid>.Ok(await _orderService.CreateAsync(request, ct)));
 
+    [HttpPost("client")]
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Orders.ClientOrders.PlaceClientOrderResponseDto>>> PlaceClientOrder([FromBody] B2BSpareParts.Application.DTOs.Orders.ClientOrders.PlaceClientOrderRequestDto request, CancellationToken ct)
+        => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Orders.ClientOrders.PlaceClientOrderResponseDto>.Ok(await _orderService.PlaceClientOrderAsync(request, ct)));
+
     [HttpPost("{id:guid}/ready")]
     public async Task<ActionResult<ApiResponse<string>>> MarkReady(Guid id, CancellationToken ct)
     {

@@ -13,5 +13,6 @@ public class AppUser : TenantEntity
     public Guid? PreferredLanguageId { get; set; }
     public bool IsActive { get; set; } = true;
 
+    public Tenant? Tenant { get; set; }
     public Shop? Shop { get; set; }
 }
