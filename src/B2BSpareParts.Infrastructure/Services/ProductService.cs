@@ -18,8 +18,9 @@ public class ProductService : IProductService
         _tenantContext = tenantContext;
     }
 
-    public async Task<PageResponse<ProductListItemResponseDto>> GetPagedAsync(PageRequest request, bool isGuestView, CancellationToken ct = default)
+    public async Task<PageResponse<ProductListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default)
     {
+        var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
             .AsNoTracking()
@@ -64,8 +65,9 @@ public class ProductService : IProductService
         return await projected.ToPageAsync(request, ct);
     }
 
-    public async Task<ProductDetailResponseDto> GetByIdAsync(Guid id, bool isGuestView, CancellationToken ct = default)
+    public async Task<ProductDetailResponseDto> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
+        var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
         var product = await _db.Products
             .AsNoTracking()
