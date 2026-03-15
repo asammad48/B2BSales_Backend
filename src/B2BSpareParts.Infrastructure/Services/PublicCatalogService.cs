@@ -155,4 +155,53 @@ public class PublicCatalogService : IPublicCatalogService
 
         return await projected.ToPageAsync(request, ct);
     }
+
+    public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(PageRequest request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var query = _db.Products
+            .AsNoTracking()
+            .Include(x => x.Category)
+            .Include(x => x.Brand)
+            .Include(x => x.Model)
+            .Include(x => x.PartType)
+            .Include(x => x.Images)
+            .Include(x => x.Tenant)
+            .ThenInclude(t => t!.BaseCurrency)
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible)
+            .OrderByDescending(x => x.CreatedAt);
+
+        var projected = query
+            .Select<Product, PublicNewArrivalProductItemDto>(x => new PublicNewArrivalProductItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                ShortDescription = x.ShortDescription,
+                Sku = x.Sku,
+                Barcode = x.Barcode,
+                CategoryId = x.CategoryId,
+                CategoryName = x.Category!.Name,
+                BrandId = x.BrandId,
+                BrandName = x.Brand != null ? x.Brand.Name : null,
+                ModelId = x.ModelId,
+                ModelName = x.Model != null ? x.Model.Name : null,
+                PartTypeId = x.PartTypeId,
+                PartTypeName = x.PartType != null ? x.PartType.Name : null,
+                PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
+                Price = x.DefaultSellingPrice,
+                CurrencyCode = x.Tenant!.BaseCurrency!.Code,
+                StockQuantity = x.TrackingType == TrackingType.Serialized
+                    ? _db.SerializedInventoryUnits.Count(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
+                IsInStock = x.TrackingType == TrackingType.Serialized
+                    ? _db.SerializedInventoryUnits.Any(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Any(i => i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
+                IsPriceLocked = true,
+                CanOrder = false,
+                Slug = null, // Field not yet implemented in Product entity
+                CreatedAt = x.CreatedAt
+            });
+
+        return await projected.ToPageAsync(request, ct);
+    }
 }
