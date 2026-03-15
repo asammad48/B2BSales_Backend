@@ -54,6 +54,41 @@ public class OrderService : IOrderService
         return await projected.ToPageAsync(request, ct);
     }
 
+    public async Task<PageResponse<ClientOrderListItemDto>> GetClientOrdersAsync(Guid clientId, PageRequest request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var query = _db.Orders
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.ClientId == clientId && !x.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLower();
+            query = query.Where(x => x.OrderNumber.ToLower().Contains(search) || x.Shop!.Name.ToLower().Contains(search));
+        }
+
+        var projected = query
+            .ApplyCreatedAtSort(request)
+            .Select(x => new ClientOrderListItemDto
+            {
+                OrderId = x.Id,
+                OrderNumber = x.OrderNumber,
+                ClientId = x.ClientId,
+                ShopId = x.ShopId,
+                ShopName = x.Shop!.Name,
+                Status = x.Status,
+                CurrencyCode = x.Currency!.Code,
+                Subtotal = x.Subtotal,
+                DiscountAmount = x.DiscountAmount,
+                TaxAmount = x.TaxAmount,
+                TotalAmount = x.TotalAmount,
+                CreatedAt = x.CreatedAt,
+                Notes = x.Notes
+            });
+
+        return await projected.ToPageAsync(request, ct);
+    }
+
     public async Task<Guid> CreateAsync(CreateOrderRequestDto request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;

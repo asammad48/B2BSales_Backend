@@ -7,4 +7,5 @@ public interface IPublicCatalogService
 {
     Task<PublicCatalogFiltersResponseDto> GetFiltersAsync(CancellationToken ct = default);
     Task<PageResponse<PublicProductListItemDto>> GetProductsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default);
+    Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(PageRequest request, CancellationToken ct = default);
 }

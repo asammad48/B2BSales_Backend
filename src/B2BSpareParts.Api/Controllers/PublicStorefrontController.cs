@@ -47,4 +47,8 @@ public class PublicStorefrontController : ControllerBase
     [HttpGet("catalog/products")]
     public async Task<ActionResult<ApiResponse<PageResponse<PublicProductListItemDto>>>> GetPublicProducts([FromQuery] GetPublicProductsRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<PublicProductListItemDto>>.Ok(await _publicCatalogService.GetProductsAsync(request, ct)));
+
+    [HttpGet("products/new-arrivals")]
+    public async Task<ActionResult<ApiResponse<PageResponse<PublicNewArrivalProductItemDto>>>> GetNewArrivals([FromQuery] PageRequest request, CancellationToken ct)
+        => Ok(ApiResponse<PageResponse<PublicNewArrivalProductItemDto>>.Ok(await _publicCatalogService.GetNewArrivalsAsync(request, ct)));
 }
