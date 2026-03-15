@@ -8,6 +8,7 @@ public interface IOrderService
 {
     Task<PageResponse<OrderListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default);
     Task<PageResponse<ClientOrderListItemDto>> GetClientOrdersAsync(Guid clientId, PageRequest request, CancellationToken ct = default);
+    Task<ClientOrderSummaryDto> GetClientOrderSummaryAsync(Guid clientId, CancellationToken ct = default);
     Task<Guid> CreateAsync(CreateOrderRequestDto request, CancellationToken ct = default);
     Task<PlaceClientOrderResponseDto> PlaceClientOrderAsync(PlaceClientOrderRequestDto request, CancellationToken ct = default);
     Task MarkReadyAsync(Guid id, CancellationToken ct = default);

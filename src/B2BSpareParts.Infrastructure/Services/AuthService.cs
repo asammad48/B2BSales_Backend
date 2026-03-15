@@ -1,7 +1,9 @@
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Auth;
+using B2BSpareParts.Common;
 using B2BSpareParts.Domain.Entities;
+using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Auth;
 using B2BSpareParts.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -40,6 +42,52 @@ public class AuthService : IAuthService
             Email = user.Email,
             Role = user.Role,
             Token = _tokenGenerator.Generate(user)
+        };
+    }
+
+    public async Task<ClientLoginResponseDto> ClientLoginAsync(ClientLoginRequestDto request, CancellationToken ct = default)
+    {
+        var user = await _db.Users
+            .FirstOrDefaultAsync(x => x.Email == request.Email && !x.IsDeleted, ct)
+            ?? throw new AppException("Invalid credentials", 401);
+
+        if (user.Role != UserRoles.Client)
+            throw new AppException("Invalid credentials", 401);
+
+        var hasher = new PasswordHasher<AppUser>();
+        var verify = hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        if (verify == PasswordVerificationResult.Failed)
+            throw new AppException("Invalid credentials", 401);
+
+        if (!user.IsActive)
+            throw new AppException("Account is inactive", 403);
+
+        var client = await _db.Clients
+            .Include(c => c.PreferredCurrency)
+            .Include(c => c.PreferredLanguage)
+            .FirstOrDefaultAsync(c => c.Email == user.Email && c.TenantId == user.TenantId && !c.IsDeleted, ct)
+            ?? throw new AppException("Client profile not found", 404);
+
+        if (client.Status != ClientStatus.Approved)
+            throw new AppException($"Client is {client.Status}", 403);
+
+        return new ClientLoginResponseDto
+        {
+            AccessToken = _tokenGenerator.Generate(user),
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
+            UserId = user.Id,
+            ClientId = client.Id,
+            ClientInfo = new ClientInfoDto
+            {
+                ClientId = client.Id,
+                Name = client.Name,
+                BusinessName = client.BusinessName,
+                Phone = client.Phone,
+                Email = client.Email,
+                PreferredCurrencyCode = client.PreferredCurrency?.Code,
+                PreferredLanguageCode = client.PreferredLanguage?.Code,
+                Status = client.Status.ToString()
+            }
         };
     }
 

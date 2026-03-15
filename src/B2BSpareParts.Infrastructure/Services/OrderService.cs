@@ -57,6 +57,19 @@ public class OrderService : IOrderService
     public async Task<PageResponse<ClientOrderListItemDto>> GetClientOrdersAsync(Guid clientId, PageRequest request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
+
+        // Enforce that a client can only see their own orders
+        if (_tenantContext.Role == UserRoles.Client)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == _tenantContext.UserId && u.TenantId == tenantId && !u.IsDeleted, ct)
+                ?? throw new AppException("User not found", 404);
+            var client = await _db.Clients.FirstOrDefaultAsync(c => c.Email == user.Email && c.TenantId == tenantId && !c.IsDeleted, ct)
+                ?? throw new AppException("Client profile not found", 404);
+
+            if (client.Id != clientId)
+                throw new AppException("Unauthorized to view these orders", 403);
+        }
+
         var query = _db.Orders
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.ClientId == clientId && !x.IsDeleted);
@@ -87,6 +100,39 @@ public class OrderService : IOrderService
             });
 
         return await projected.ToPageAsync(request, ct);
+    }
+
+    public async Task<ClientOrderSummaryDto> GetClientOrderSummaryAsync(Guid clientId, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // Enforce that a client can only see their own summary
+        if (_tenantContext.Role == UserRoles.Client)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == _tenantContext.UserId && u.TenantId == tenantId && !u.IsDeleted, ct)
+                ?? throw new AppException("User not found", 404);
+            var client = await _db.Clients.FirstOrDefaultAsync(c => c.Email == user.Email && c.TenantId == tenantId && !c.IsDeleted, ct)
+                ?? throw new AppException("Client profile not found", 404);
+
+            if (client.Id != clientId)
+                throw new AppException("Unauthorized to view this summary", 403);
+        }
+
+        var orders = await _db.Orders
+            .Where(x => x.TenantId == tenantId && x.ClientId == clientId && !x.IsDeleted)
+            .Select(x => x.Status)
+            .ToListAsync(ct);
+
+        return new ClientOrderSummaryDto
+        {
+            ClientId = clientId,
+            TotalOrders = orders.Count,
+            CompletedOrders = orders.Count(x => x == OrderStatus.Completed),
+            PendingOrders = orders.Count(x => x == OrderStatus.Pending),
+            ReadyForPickupOrders = orders.Count(x => x == OrderStatus.ReadyForPickup),
+            CancelledOrders = orders.Count(x => x == OrderStatus.Cancelled),
+            UnableToFulfillOrders = orders.Count(x => x == OrderStatus.UnableToFulfill)
+        };
     }
 
     public async Task<Guid> CreateAsync(CreateOrderRequestDto request, CancellationToken ct = default)
