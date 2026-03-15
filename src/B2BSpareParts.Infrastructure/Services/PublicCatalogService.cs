@@ -85,6 +85,7 @@ public class PublicCatalogService : IPublicCatalogService
 
     public async Task<PageResponse<PublicProductListItemDto>> GetProductsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
+        var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
             .AsNoTracking()
@@ -148,8 +149,8 @@ public class PublicCatalogService : IPublicCatalogService
                 IsInStock = x.TrackingType == TrackingType.Serialized
                     ? _db.SerializedInventoryUnits.Any(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
                     : _db.ShopInventories.Any(i => i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
-                IsPriceLocked = true,
-                CanOrder = false,
+                IsPriceLocked = isGuestView,
+                CanOrder = !isGuestView,
                 Slug = null // Field not yet implemented in Product entity
             });
 
@@ -158,6 +159,7 @@ public class PublicCatalogService : IPublicCatalogService
 
     public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(PageRequest request, CancellationToken ct = default)
     {
+        var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
             .AsNoTracking()
@@ -196,8 +198,8 @@ public class PublicCatalogService : IPublicCatalogService
                 IsInStock = x.TrackingType == TrackingType.Serialized
                     ? _db.SerializedInventoryUnits.Any(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
                     : _db.ShopInventories.Any(i => i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
-                IsPriceLocked = true,
-                CanOrder = false,
+                IsPriceLocked = isGuestView,
+                CanOrder = !isGuestView,
                 Slug = null, // Field not yet implemented in Product entity
                 CreatedAt = x.CreatedAt
             });

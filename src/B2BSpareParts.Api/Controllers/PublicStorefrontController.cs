@@ -34,11 +34,11 @@ public class PublicStorefrontController : ControllerBase
 
     [HttpGet("storefront/products")]
     public async Task<ActionResult<ApiResponse<PageResponse<ProductListItemResponseDto>>>> GetProducts([FromQuery] PageRequest request, CancellationToken ct)
-        => Ok(ApiResponse<PageResponse<ProductListItemResponseDto>>.Ok(await _productService.GetPagedAsync(request, true, ct)));
+        => Ok(ApiResponse<PageResponse<ProductListItemResponseDto>>.Ok(await _productService.GetPagedAsync(request, ct)));
 
     [HttpGet("storefront/products/{id:guid}")]
     public async Task<ActionResult<ApiResponse<ProductDetailResponseDto>>> GetProduct(Guid id, CancellationToken ct)
-        => Ok(ApiResponse<ProductDetailResponseDto>.Ok(await _productService.GetByIdAsync(id, true, ct)));
+        => Ok(ApiResponse<ProductDetailResponseDto>.Ok(await _productService.GetByIdAsync(id, ct)));
 
     [HttpGet("catalog/filters")]
     public async Task<ActionResult<ApiResponse<PublicCatalogFiltersResponseDto>>> GetFilters(CancellationToken ct)
