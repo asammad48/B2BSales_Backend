@@ -37,9 +37,24 @@ public class NotificationService : INotificationService
                 Title = x.Title,
                 Message = x.Message,
                 IsRead = x.IsRead,
-                CreatedAt = x.CreatedAt
+                CreatedAt = x.CreatedAt,
+                ReferenceId = x.RelatedEntityId,
+                ReferenceType = x.Type == B2BSpareParts.Domain.Enums.NotificationType.NewOrder || x.Type == B2BSpareParts.Domain.Enums.NotificationType.OrderReady || x.Type == B2BSpareParts.Domain.Enums.NotificationType.OrderUnableToFulfill ? "Order" :
+                                x.Type == B2BSpareParts.Domain.Enums.NotificationType.LowStock ? "Product" :
+                                x.Type == B2BSpareParts.Domain.Enums.NotificationType.TransferDispatched || x.Type == B2BSpareParts.Domain.Enums.NotificationType.TransferReceived ? "StockTransfer" : null
             });
 
         return await projected.ToPageAsync(request, ct);
+    }
+
+    public async Task MarkAsReadAsync(Guid id, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var notification = await _db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
+            ?? throw new AppException("Notification not found", 404);
+
+        notification.IsRead = true;
+        notification.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
     }
 }

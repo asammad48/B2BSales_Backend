@@ -2,6 +2,7 @@ using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Products;
 using B2BSpareParts.Domain.Entities;
+using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -170,5 +171,49 @@ public class ProductService : IProductService
         _db.Products.Add(product);
         await _db.SaveChangesAsync(ct);
         return product.Id;
+    }
+
+    public async Task<ProductPricingAdjustmentResultDto> AdjustPricingAsync(Guid productId, AdjustProductPricingRequestDto request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var product = await _db.Products
+            .FirstOrDefaultAsync(x => x.Id == productId && x.TenantId == tenantId && !x.IsDeleted, ct)
+            ?? throw new AppException("Product not found", 404);
+
+        product.DefaultBuyingPrice = request.BuyingPrice;
+
+        if (request.PricingMode.HasValue)
+        {
+            product.DefaultPricingMode = request.PricingMode.Value;
+        }
+
+        if (request.MarkupPercentage.HasValue)
+        {
+            product.DefaultMarkupPercentage = request.MarkupPercentage.Value;
+        }
+
+        if (product.DefaultPricingMode == PricingMode.PercentageBased && product.DefaultMarkupPercentage.HasValue)
+        {
+            product.DefaultSellingPrice = product.DefaultBuyingPrice + (product.DefaultBuyingPrice * product.DefaultMarkupPercentage.Value / 100m);
+        }
+        else
+        {
+            product.DefaultSellingPrice = request.SellingPrice;
+        }
+
+        product.UpdatedAt = DateTimeOffset.UtcNow;
+        // Logic for auditing "Reason" could be added here if an audit table existed.
+
+        await _db.SaveChangesAsync(ct);
+
+        return new ProductPricingAdjustmentResultDto
+        {
+            ProductId = product.Id,
+            BuyingPrice = product.DefaultBuyingPrice,
+            SellingPrice = product.DefaultSellingPrice,
+            PricingMode = product.DefaultPricingMode,
+            MarkupPercentage = product.DefaultMarkupPercentage,
+            UpdatedAt = product.UpdatedAt ?? DateTimeOffset.UtcNow
+        };
     }
 }

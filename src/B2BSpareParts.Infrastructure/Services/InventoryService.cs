@@ -249,6 +249,16 @@ public class InventoryService : IInventoryService
         transfer.Status = StockTransferStatus.Dispatched;
         transfer.DispatchedByUserId = _tenantContext.UserId;
         transfer.UpdatedAt = DateTimeOffset.UtcNow;
+
+        _db.Notifications.Add(new Notification
+        {
+            TenantId = tenantId,
+            Type = NotificationType.TransferDispatched,
+            Title = "Stock Transfer Dispatched",
+            Message = $"Stock transfer {transfer.Id} has been dispatched to shop {transfer.DestinationShopId}.",
+            RelatedEntityId = transfer.Id
+        });
+
         await _db.SaveChangesAsync(ct);
     }
 
@@ -301,6 +311,16 @@ public class InventoryService : IInventoryService
         transfer.Status = StockTransferStatus.Received;
         transfer.ReceivedByUserId = _tenantContext.UserId;
         transfer.UpdatedAt = DateTimeOffset.UtcNow;
+
+        _db.Notifications.Add(new Notification
+        {
+            TenantId = tenantId,
+            Type = NotificationType.TransferReceived,
+            Title = "Stock Transfer Received",
+            Message = $"Stock transfer {transfer.Id} has been received at shop {transfer.DestinationShopId}.",
+            RelatedEntityId = transfer.Id
+        });
+
         await _db.SaveChangesAsync(ct);
     }
 

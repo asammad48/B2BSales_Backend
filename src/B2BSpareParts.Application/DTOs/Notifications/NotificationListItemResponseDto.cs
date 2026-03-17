@@ -8,4 +8,6 @@ public class NotificationListItemResponseDto
     public string Message { get; set; } = default!;
     public bool IsRead { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public Guid? ReferenceId { get; set; }
+    public string? ReferenceType { get; set; }
 }
