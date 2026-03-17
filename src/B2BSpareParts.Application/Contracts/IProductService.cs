@@ -8,4 +8,5 @@ public interface IProductService
     Task<PageResponse<ProductListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default);
     Task<ProductDetailResponseDto> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Guid> CreateAsync(CreateProductRequestDto request, CancellationToken ct = default);
+    Task<ProductPricingAdjustmentResultDto> AdjustPricingAsync(Guid productId, AdjustProductPricingRequestDto request, CancellationToken ct = default);
 }

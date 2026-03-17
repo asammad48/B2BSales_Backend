@@ -199,6 +199,16 @@ public class OrderService : IOrderService
         order.Subtotal = order.Items.Sum(x => x.LineTotal);
         order.TotalAmount = order.Subtotal + order.TaxAmount - order.DiscountAmount;
         _db.Orders.Add(order);
+
+        _db.Notifications.Add(new Notification
+        {
+            TenantId = tenantId,
+            Type = NotificationType.NewOrder,
+            Title = "New Order",
+            Message = $"New order {order.OrderNumber} created for {client.BusinessName}.",
+            RelatedEntityId = order.Id
+        });
+
         await _db.SaveChangesAsync(ct);
 
         return order.Id;
@@ -280,6 +290,16 @@ public class OrderService : IOrderService
         order.TotalAmount = order.Subtotal + order.TaxAmount - order.DiscountAmount;
 
         _db.Orders.Add(order);
+
+        _db.Notifications.Add(new Notification
+        {
+            TenantId = tenantId,
+            Type = NotificationType.NewOrder,
+            Title = "New Client Order",
+            Message = $"New client order {order.OrderNumber} placed by {client.BusinessName}.",
+            RelatedEntityId = order.Id
+        });
+
         await _db.SaveChangesAsync(ct);
 
         return new PlaceClientOrderResponseDto
@@ -403,14 +423,23 @@ public class OrderService : IOrderService
 
                 if (stock.QuantityOnHand <= stock.LowStockThreshold)
                 {
-                    _db.Notifications.Add(new Notification
+                    var exists = await _db.Notifications.AnyAsync(x =>
+                        x.TenantId == tenantId &&
+                        x.Type == NotificationType.LowStock &&
+                        x.RelatedEntityId == item.ProductId &&
+                        !x.IsDeleted, ct);
+
+                    if (!exists)
                     {
-                        TenantId = tenantId,
-                        Type = NotificationType.LowStock,
-                        Title = "Low stock alert",
-                        Message = $"{product.Name} is low in stock at shop {order.ShopId}",
-                        RelatedEntityId = product.Id
-                    });
+                        _db.Notifications.Add(new Notification
+                        {
+                            TenantId = tenantId,
+                            Type = NotificationType.LowStock,
+                            Title = "Low stock alert",
+                            Message = $"{product.Name} is low in stock at shop {order.ShopId}",
+                            RelatedEntityId = product.Id
+                        });
+                    }
                 }
             }
         }
@@ -434,6 +463,16 @@ public class OrderService : IOrderService
             ? order.Notes
             : string.IsNullOrWhiteSpace(order.Notes) ? reason : order.Notes + $" | {reason}";
         order.UpdatedAt = DateTimeOffset.UtcNow;
+
+        _db.Notifications.Add(new Notification
+        {
+            TenantId = tenantId,
+            Type = NotificationType.OrderUnableToFulfill,
+            Title = "Order Unable to Fulfill",
+            Message = $"Order {order.OrderNumber} marked as unable to fulfill. Reason: {reason}",
+            RelatedEntityId = order.Id
+        });
+
         await _db.SaveChangesAsync(ct);
     }
 }

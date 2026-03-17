@@ -31,6 +31,9 @@ public static class DependencyInjection
         services.AddScoped<IThemeService, ThemeService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IReportService, ReportService>();
+        services.AddScoped<IDateRangeService, DateRangeService>();
 
         return services;
     }
