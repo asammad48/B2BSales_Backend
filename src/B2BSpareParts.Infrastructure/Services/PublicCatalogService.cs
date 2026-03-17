@@ -83,6 +83,67 @@ public class PublicCatalogService : IPublicCatalogService
         };
     }
 
+    public async Task<PublicCatalogLookupsResponseDto> GetLookupsAsync(CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var categories = await _db.Categories
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Select(x => new PublicLookupItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Code = x.Code
+            })
+            .ToListAsync(ct);
+
+        var brands = await _db.Brands
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Select(x => new PublicLookupItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Code = x.Code
+            })
+            .ToListAsync(ct);
+
+        var models = await _db.DeviceModels
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Select(x => new PublicLookupItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Code = x.Code
+            })
+            .ToListAsync(ct);
+
+        var partTypes = await _db.PartTypes
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Select(x => new PublicLookupItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Code = x.Code
+            })
+            .ToListAsync(ct);
+
+        return new PublicCatalogLookupsResponseDto
+        {
+            Categories = categories,
+            Brands = brands,
+            Models = models,
+            PartTypes = partTypes
+        };
+    }
+
     public async Task<PageResponse<PublicProductListItemDto>> GetProductsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
         var isGuestView = _tenantContext.UserId == null;
