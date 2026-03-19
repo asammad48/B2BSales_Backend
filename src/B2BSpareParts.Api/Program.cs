@@ -5,10 +5,15 @@ using B2BSpareParts.Common;
 using B2BSpareParts.Infrastructure;
 using B2BSpareParts.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = Directory.GetCurrentDirectory()
+});
 
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -105,6 +110,20 @@ app.UseExceptionHandler(handler =>
 });
 app.UseCors("AllowAllOrigins");
 app.UseHttpsRedirection();
+
+var uploadFolder = builder.Configuration["FileStorage:UploadFolder"] ?? "uploads";
+var uploadPath = Path.Combine(builder.Environment.ContentRootPath, uploadFolder);
+if (!Directory.Exists(uploadPath))
+{
+    Directory.CreateDirectory(uploadPath);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadPath),
+    RequestPath = $"/{uploadFolder}"
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
