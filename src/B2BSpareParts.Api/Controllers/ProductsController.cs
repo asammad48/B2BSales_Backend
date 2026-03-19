@@ -53,6 +53,8 @@ public class ProductsController : ControllerBase
             Directory.CreateDirectory(uploadPath);
         }
 
+        request.Images ??= [];
+
         for (int i = 0; i < images.Count; i++)
         {
             var file = images[i];
@@ -66,8 +68,6 @@ public class ProductsController : ControllerBase
                     await file.CopyToAsync(stream, ct);
                 }
 
-                request.Images ??= [];
-
                 // If images were already provided in the DTO, update the first matching one or add a new one
                 if (request.Images.Count > i)
                 {
@@ -78,8 +78,8 @@ public class ProductsController : ControllerBase
                     request.Images.Add(new CreateProductImageRequestDto
                     {
                         FilePath = $"{uploadFolder}/{fileName}",
-                        IsPrimary = i == 0,
-                        SortOrder = i
+                        IsPrimary = request.Images.Count == 0, // Fallback if no image is marked primary
+                        SortOrder = request.Images.Count
                     });
                 }
             }

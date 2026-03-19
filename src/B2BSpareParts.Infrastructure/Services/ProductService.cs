@@ -137,6 +137,34 @@ public class ProductService : IProductService
         var tenantId = _tenantContext.TenantId;
         if (tenantId == Guid.Empty) throw new AppException("Tenant context missing", 400);
 
+        if (request.Images == null || request.Images.Count == 0)
+        {
+            throw new AppException("At least one image is required", 400);
+        }
+
+        if (request.Images.Count(x => x.IsPrimary) != 1)
+        {
+            // If none are marked primary, or more than one, we fix it
+            if (request.Images.Count(x => x.IsPrimary) == 0)
+            {
+                request.Images.First().IsPrimary = true;
+            }
+            else
+            {
+                var firstPrimary = request.Images.First(x => x.IsPrimary);
+                foreach (var img in request.Images) img.IsPrimary = false;
+                firstPrimary.IsPrimary = true;
+            }
+        }
+
+        var markupPercentage = request.DefaultPricingMode == PricingMode.PercentageBased
+            ? (request.DefaultMarkupPercentage ?? 0)
+            : (decimal?)null;
+
+        var sellingPrice = request.DefaultPricingMode == PricingMode.PercentageBased
+            ? request.DefaultBuyingPrice + (request.DefaultBuyingPrice * markupPercentage!.Value / 100m)
+            : request.DefaultSellingPrice;
+
         var product = new Product
         {
             TenantId = tenantId,
@@ -153,12 +181,12 @@ public class ProductService : IProductService
             TrackingType = request.TrackingType,
             QualityType = request.QualityType,
             DefaultBuyingPrice = request.DefaultBuyingPrice,
-            DefaultSellingPrice = request.DefaultSellingPrice,
+            DefaultSellingPrice = sellingPrice,
             DefaultPricingMode = request.DefaultPricingMode,
-            DefaultMarkupPercentage = request.DefaultMarkupPercentage,
+            DefaultMarkupPercentage = markupPercentage,
             WarrantyDays = request.WarrantyDays,
             LowStockThreshold = request.LowStockThreshold,
-            Images = request.Images.Select(x => new ProductImage
+            Images = request.Images.OrderBy(x => x.SortOrder).Select(x => new ProductImage
             {
                 TenantId = tenantId,
                 FilePath = x.FilePath,
@@ -187,17 +215,14 @@ public class ProductService : IProductService
             product.DefaultPricingMode = request.PricingMode.Value;
         }
 
-        if (request.MarkupPercentage.HasValue)
+        if (product.DefaultPricingMode == PricingMode.PercentageBased)
         {
-            product.DefaultMarkupPercentage = request.MarkupPercentage.Value;
-        }
-
-        if (product.DefaultPricingMode == PricingMode.PercentageBased && product.DefaultMarkupPercentage.HasValue)
-        {
+            product.DefaultMarkupPercentage = request.MarkupPercentage ?? 0;
             product.DefaultSellingPrice = product.DefaultBuyingPrice + (product.DefaultBuyingPrice * product.DefaultMarkupPercentage.Value / 100m);
         }
         else
         {
+            product.DefaultMarkupPercentage = null;
             product.DefaultSellingPrice = request.SellingPrice;
         }
 

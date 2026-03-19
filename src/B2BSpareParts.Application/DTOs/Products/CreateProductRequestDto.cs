@@ -22,5 +22,5 @@ public class CreateProductRequestDto
     public decimal? DefaultMarkupPercentage { get; set; }
     public int WarrantyDays { get; set; }
     public int LowStockThreshold { get; set; }
-    public List<CreateProductImageRequestDto> Images { get; set; } = [];
+    public List<CreateProductImageRequestDto>? Images { get; set; }
 }
