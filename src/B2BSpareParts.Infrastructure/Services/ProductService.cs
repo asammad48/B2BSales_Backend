@@ -59,6 +59,7 @@ public class ProductService : IProductService
                 DefaultSellingPrice = x.DefaultSellingPrice,
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 IsActive = x.IsActive,
+                SortOrder = x.SortOrder,
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView
             });
@@ -128,14 +129,53 @@ public class ProductService : IProductService
             RelatedProducts = related,
             IsPriceLocked = isGuestView,
             CanOrder = !isGuestView,
+            SortOrder = product.SortOrder,
             AvailabilityMessage = isGuestView ? "Login required to view price and place order." : "Available for approved logged-in clients."
         };
+    }
+
+    public async Task<PageResponse<ProductLookupItemDto>> GetLookupAsync(PageRequest request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var query = _db.Products
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var s = request.Search.Trim().ToLower();
+            query = query.Where(x => x.Name.ToLower().Contains(s) || x.Sku.ToLower().Contains(s));
+        }
+
+        var projected = query
+            .OrderBy(x => x.Name)
+            .Select(x => new ProductLookupItemDto
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Sku = x.Sku,
+                BrandName = x.Brand != null ? x.Brand.Name : null,
+                ModelName = x.Model != null ? x.Model.Name : null,
+                TrackingType = x.TrackingType
+            });
+
+        return await projected.ToPageAsync(request, ct);
     }
 
     public async Task<Guid> CreateAsync(CreateProductRequestDto request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
         if (tenantId == Guid.Empty) throw new AppException("Tenant context missing", 400);
+
+        if (request.Images == null || !request.Images.Any())
+        {
+            throw new AppException("At least one image is required.", 400);
+        }
+
+        if (request.Images.Count(x => x.IsPrimary) != 1)
+        {
+            throw new AppException("Exactly one image must be marked as primary.", 400);
+        }
 
         var product = new Product
         {
@@ -153,11 +193,11 @@ public class ProductService : IProductService
             TrackingType = request.TrackingType,
             QualityType = request.QualityType,
             DefaultBuyingPrice = request.DefaultBuyingPrice,
-            DefaultSellingPrice = request.DefaultSellingPrice,
             DefaultPricingMode = request.DefaultPricingMode,
-            DefaultMarkupPercentage = request.DefaultMarkupPercentage,
+            DefaultMarkupPercentage = request.DefaultMarkupPercentage ?? 0,
             WarrantyDays = request.WarrantyDays,
             LowStockThreshold = request.LowStockThreshold,
+            SortOrder = request.SortOrder,
             Images = request.Images.Select(x => new ProductImage
             {
                 TenantId = tenantId,
@@ -167,6 +207,15 @@ public class ProductService : IProductService
                 SortOrder = x.SortOrder
             }).ToList()
         };
+
+        if (product.DefaultPricingMode == PricingMode.PercentageBased)
+        {
+            product.DefaultSellingPrice = product.DefaultBuyingPrice + (product.DefaultBuyingPrice * (product.DefaultMarkupPercentage ?? 0) / 100m);
+        }
+        else
+        {
+            product.DefaultSellingPrice = request.DefaultSellingPrice;
+        }
 
         _db.Products.Add(product);
         await _db.SaveChangesAsync(ct);
@@ -187,14 +236,11 @@ public class ProductService : IProductService
             product.DefaultPricingMode = request.PricingMode.Value;
         }
 
-        if (request.MarkupPercentage.HasValue)
-        {
-            product.DefaultMarkupPercentage = request.MarkupPercentage.Value;
-        }
+        product.DefaultMarkupPercentage = request.MarkupPercentage ?? 0;
 
-        if (product.DefaultPricingMode == PricingMode.PercentageBased && product.DefaultMarkupPercentage.HasValue)
+        if (product.DefaultPricingMode == PricingMode.PercentageBased)
         {
-            product.DefaultSellingPrice = product.DefaultBuyingPrice + (product.DefaultBuyingPrice * product.DefaultMarkupPercentage.Value / 100m);
+            product.DefaultSellingPrice = product.DefaultBuyingPrice + (product.DefaultBuyingPrice * (product.DefaultMarkupPercentage ?? 0) / 100m);
         }
         else
         {

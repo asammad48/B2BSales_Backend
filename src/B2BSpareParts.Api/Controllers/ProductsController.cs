@@ -41,6 +41,10 @@ public class ProductsController : ControllerBase
     public async Task<ActionResult<ApiResponse<ProductDetailResponseDto>>> GetById(Guid id, CancellationToken ct)
         => Ok(ApiResponse<ProductDetailResponseDto>.Ok(await _productService.GetByIdAsync(id, ct)));
 
+    [HttpGet("lookup")]
+    public async Task<ActionResult<ApiResponse<PageResponse<ProductLookupItemDto>>>> GetLookup([FromQuery] PageRequest request, CancellationToken ct)
+        => Ok(ApiResponse<PageResponse<ProductLookupItemDto>>.Ok(await _productService.GetLookupAsync(request, ct)));
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<Guid>>> Create([FromForm] CreateProductRequestDto request, [FromForm] List<IFormFile> images, CancellationToken ct)
