@@ -43,7 +43,7 @@ public class ProductsController : ControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<ApiResponse<Guid>>> Create([FromForm] CreateProductRequestDto request, [FromForm] List<IFormFile> images, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<Guid>>> Create([FromForm] CreateProductRequestDto request, [FromForm] List<IFormFile> imageFiles, CancellationToken ct)
     {
         var uploadFolder = _configuration["FileStorage:UploadFolder"] ?? "uploads";
         var uploadPath = Path.Combine(_env.ContentRootPath, uploadFolder);
@@ -55,9 +55,9 @@ public class ProductsController : ControllerBase
 
         request.Images ??= [];
 
-        for (int i = 0; i < images.Count; i++)
+        for (int i = 0; i < imageFiles.Count; i++)
         {
-            var file = images[i];
+            var file = imageFiles[i];
             if (file.Length > 0)
             {
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
