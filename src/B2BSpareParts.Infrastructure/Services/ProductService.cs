@@ -77,6 +77,7 @@ public class ProductService : IProductService
             .Include(x => x.Model)
             .Include(x => x.PartType)
             .Include(x => x.Images)
+            .Include(x => x.BaseCurrency)
             .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
             ?? throw new AppException("Product not found", 404);
 
@@ -109,6 +110,9 @@ public class ProductService : IProductService
             PartTypeName = product.PartType?.Name,
             TrackingType = product.TrackingType,
             QualityType = product.QualityType,
+            BaseCurrencyId = product.BaseCurrencyId,
+            BaseCurrencyCode = product.BaseCurrency?.Code ?? string.Empty,
+            BasePrice = product.BasePrice,
             DefaultBuyingPrice = isGuestView ? null : product.DefaultBuyingPrice,
             DefaultSellingPrice = isGuestView ? null : product.DefaultSellingPrice,
             DefaultPricingMode = product.DefaultPricingMode,
@@ -157,12 +161,31 @@ public class ProductService : IProductService
             }
         }
 
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct)
+            ?? throw new AppException("Tenant not found", 400);
+
+        var rate = 1.0m;
+        if (request.BaseCurrencyId != tenant.DefaultSellingCurrencyId)
+        {
+            var exchangeRate = await _db.ExchangeRates
+                .FirstOrDefaultAsync(er => er.TenantId == tenantId &&
+                                          er.FromCurrencyId == request.BaseCurrencyId &&
+                                          er.ToCurrencyId == tenant.DefaultSellingCurrencyId, ct);
+
+            if (exchangeRate == null)
+                throw new AppException("Exchange rate not found for the selected base currency.", 400);
+
+            rate = exchangeRate.Rate;
+        }
+
+        var buyingPrice = request.BasePrice * rate;
+
         var markupPercentage = request.DefaultPricingMode == PricingMode.PercentageBased
             ? (request.DefaultMarkupPercentage ?? 0)
             : (decimal?)null;
 
         var sellingPrice = request.DefaultPricingMode == PricingMode.PercentageBased
-            ? request.DefaultBuyingPrice + (request.DefaultBuyingPrice * markupPercentage!.Value / 100m)
+            ? buyingPrice + (buyingPrice * markupPercentage!.Value / 100m)
             : request.DefaultSellingPrice;
 
         var product = new Product
@@ -180,7 +203,9 @@ public class ProductService : IProductService
             Specifications = request.Specifications,
             TrackingType = request.TrackingType,
             QualityType = request.QualityType,
-            DefaultBuyingPrice = request.DefaultBuyingPrice,
+            BaseCurrencyId = request.BaseCurrencyId,
+            BasePrice = request.BasePrice,
+            DefaultBuyingPrice = buyingPrice,
             DefaultSellingPrice = sellingPrice,
             DefaultPricingMode = request.DefaultPricingMode,
             DefaultMarkupPercentage = markupPercentage,
@@ -208,7 +233,34 @@ public class ProductService : IProductService
             .FirstOrDefaultAsync(x => x.Id == productId && x.TenantId == tenantId && !x.IsDeleted, ct)
             ?? throw new AppException("Product not found", 404);
 
-        product.DefaultBuyingPrice = request.BuyingPrice;
+        if (request.BaseCurrencyId.HasValue)
+        {
+            product.BaseCurrencyId = request.BaseCurrencyId.Value;
+        }
+
+        if (request.BasePrice.HasValue)
+        {
+            product.BasePrice = request.BasePrice.Value;
+        }
+
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, ct)
+            ?? throw new AppException("Tenant not found", 400);
+
+        var rate = 1.0m;
+        if (product.BaseCurrencyId != tenant.DefaultSellingCurrencyId)
+        {
+            var exchangeRate = await _db.ExchangeRates
+                .FirstOrDefaultAsync(er => er.TenantId == tenantId &&
+                                          er.FromCurrencyId == product.BaseCurrencyId &&
+                                          er.ToCurrencyId == tenant.DefaultSellingCurrencyId, ct);
+
+            if (exchangeRate == null)
+                throw new AppException("Exchange rate not found for the selected base currency.", 400);
+
+            rate = exchangeRate.Rate;
+        }
+
+        product.DefaultBuyingPrice = product.BasePrice * rate;
 
         if (request.PricingMode.HasValue)
         {

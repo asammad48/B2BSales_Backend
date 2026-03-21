@@ -17,6 +17,8 @@ public class Product : TenantEntity
     public string? Specifications { get; set; }
     public TrackingType TrackingType { get; set; }
     public QualityType QualityType { get; set; }
+    public Guid BaseCurrencyId { get; set; }
+    public decimal BasePrice { get; set; }
     public decimal DefaultBuyingPrice { get; set; }
     public decimal DefaultSellingPrice { get; set; }
     public PricingMode DefaultPricingMode { get; set; }
@@ -30,6 +32,7 @@ public class Product : TenantEntity
     public Tenant? Tenant { get; set; }
     public Category? Category { get; set; }
     public Brand? Brand { get; set; }
+    public Currency? BaseCurrency { get; set; }
     public DeviceModel? Model { get; set; }
     public PartType? PartType { get; set; }
     public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();

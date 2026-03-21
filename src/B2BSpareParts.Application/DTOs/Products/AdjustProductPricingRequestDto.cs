@@ -4,6 +4,8 @@ namespace B2BSpareParts.Application.DTOs.Products;
 
 public class AdjustProductPricingRequestDto
 {
+    public Guid? BaseCurrencyId { get; set; }
+    public decimal? BasePrice { get; set; }
     public decimal BuyingPrice { get; set; }
     public decimal SellingPrice { get; set; }
     public PricingMode? PricingMode { get; set; }
