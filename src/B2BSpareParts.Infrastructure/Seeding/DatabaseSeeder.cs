@@ -18,8 +18,6 @@ public class DatabaseSeeder
 
     public async Task SeedAsync(CancellationToken ct = default)
     {
-        await _db.Database.EnsureCreatedAsync(ct);
-
         if (await _db.Tenants.AnyAsync(ct))
             return;
 

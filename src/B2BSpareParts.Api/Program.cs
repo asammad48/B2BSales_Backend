@@ -3,8 +3,10 @@ using System.Text.Json.Serialization;
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Common;
 using B2BSpareParts.Infrastructure;
+using B2BSpareParts.Infrastructure.Persistence;
 using B2BSpareParts.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -130,7 +132,9 @@ app.MapControllers();
 
 using (var scope = app.Services.CreateScope())
 {
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await dbContext.Database.MigrateAsync();
     await seeder.SeedAsync();
 }
 
