@@ -16,6 +16,8 @@ public class CreateProductRequestDto
     public string? Specifications { get; set; }
     public TrackingType TrackingType { get; set; }
     public QualityType QualityType { get; set; }
+    public Guid BaseCurrencyId { get; set; }
+    public decimal BasePrice { get; set; }
     public decimal DefaultBuyingPrice { get; set; }
     public decimal DefaultSellingPrice { get; set; }
     public PricingMode DefaultPricingMode { get; set; }

@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<DatabaseSeeder>();
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ITenantCurrencyService, TenantCurrencyService>();
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IPublicCatalogService, PublicCatalogService>();
         services.AddScoped<IPublicShopService, PublicShopService>();
