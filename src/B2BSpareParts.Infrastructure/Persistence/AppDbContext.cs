@@ -32,6 +32,7 @@ public class AppDbContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ThemeSetting> ThemeSettings => Set<ThemeSetting>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<ContactInquiry> ContactInquiries => Set<ContactInquiry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

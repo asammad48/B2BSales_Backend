@@ -1,6 +1,7 @@
 
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
+using B2BSpareParts.Application.DTOs.ContactInquiries;
 using B2BSpareParts.Application.DTOs.Products;
 using B2BSpareParts.Application.DTOs.PublicCatalog;
 using B2BSpareParts.Application.DTOs.Themes;
@@ -18,14 +19,18 @@ public class PublicStorefrontController : ControllerBase
     private readonly IPublicCatalogService _publicCatalogService;
     private readonly IThemeService _themeService;
 
+    private readonly IContactInquiryService _contactInquiryService;
+
     public PublicStorefrontController(
         IProductService productService,
         IPublicCatalogService publicCatalogService,
-        IThemeService themeService)
+        IThemeService themeService,
+        IContactInquiryService contactInquiryService)
     {
         _productService = productService;
         _publicCatalogService = publicCatalogService;
         _themeService = themeService;
+        _contactInquiryService = contactInquiryService;
     }
 
     [HttpGet("storefront/theme")]
@@ -55,4 +60,8 @@ public class PublicStorefrontController : ControllerBase
     [HttpGet("products/new-arrivals")]
     public async Task<ActionResult<ApiResponse<PageResponse<PublicNewArrivalProductItemDto>>>> GetNewArrivals([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<PublicNewArrivalProductItemDto>>.Ok(await _publicCatalogService.GetNewArrivalsAsync(request, ct)));
+
+    [HttpPost("contact")]
+    public async Task<ActionResult<ApiResponse<CreateContactInquiryResponseDto>>> CreateContactInquiry([FromBody] CreateContactInquiryRequestDto request, CancellationToken ct)
+        => Ok(ApiResponse<CreateContactInquiryResponseDto>.Ok(await _contactInquiryService.CreateAsync(request, ct)));
 }

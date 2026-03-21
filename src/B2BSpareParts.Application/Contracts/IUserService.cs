@@ -7,4 +7,5 @@ public interface IUserService
 {
     Task<UserProfileResponseDto> GetMeAsync(CancellationToken ct = default);
     Task<PageResponse<UserListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default);
+    Task<UserListItemResponseDto> CreateAsync(CreateUserRequestDto request, CancellationToken ct = default);
 }

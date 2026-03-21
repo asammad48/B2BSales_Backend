@@ -25,4 +25,8 @@ public class UsersController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Users.UserListItemResponseDto>>>> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Users.UserListItemResponseDto>>.Ok(await _userService.GetPagedAsync(request, ct)));
+
+    [HttpPost]
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Users.UserListItemResponseDto>>> Create([FromBody] B2BSpareParts.Application.DTOs.Users.CreateUserRequestDto request, CancellationToken ct)
+        => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Users.UserListItemResponseDto>.Ok(await _userService.CreateAsync(request, ct)));
 }

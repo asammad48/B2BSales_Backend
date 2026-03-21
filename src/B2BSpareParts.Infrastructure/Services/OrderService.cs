@@ -54,6 +54,54 @@ public class OrderService : IOrderService
         return await projected.ToPageAsync(request, ct);
     }
 
+    public async Task<OrderDetailsDto> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var order = await _db.Orders
+            .AsNoTracking()
+            .Include(x => x.Client)
+            .Include(x => x.Shop)
+            .Include(x => x.Currency)
+            .Include(x => x.Items)
+                .ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
+            ?? throw new AppException("Order not found", 404);
+
+        return new OrderDetailsDto
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            ClientId = order.ClientId,
+            ClientName = order.Client!.Name,
+            BusinessName = order.Client.BusinessName,
+            ShopId = order.ShopId,
+            ShopName = order.Shop!.Name,
+            Status = order.Status.ToString(),
+            StatusLabel = order.Status.ToString(),
+            CurrencyCode = order.Currency!.Code,
+            Subtotal = order.Subtotal,
+            DiscountAmount = order.DiscountAmount,
+            TaxAmount = order.TaxAmount,
+            TotalAmount = order.TotalAmount,
+            Notes = order.Notes,
+            CreatedAt = order.CreatedAt,
+            // In a real system, you'd track when it was marked ready/completed separately if needed.
+            // Using UpdatedAt as a fallback for now if status is Ready/Completed.
+            ReadyAt = order.Status >= OrderStatus.ReadyForPickup ? order.UpdatedAt : null,
+            CompletedAt = order.Status == OrderStatus.Completed ? order.UpdatedAt : null,
+            Items = order.Items.Select(i => new OrderDetailsItemDto
+            {
+                OrderItemId = i.Id,
+                ProductId = i.ProductId,
+                ProductName = i.Product!.Name,
+                Sku = i.Product.Sku,
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                LineTotal = i.LineTotal
+            }).ToList()
+        };
+    }
+
     public async Task<PageResponse<ClientOrderListItemDto>> GetClientOrdersAsync(Guid clientId, PageRequest request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;

@@ -9,5 +9,6 @@ public enum NotificationType
     TransferDispatched = 5,
     TransferReceived = 6,
     OrderUnableToFulfill = 7,
-    SystemImportant = 8
+    SystemImportant = 8,
+    NewInquiry = 9
 }
