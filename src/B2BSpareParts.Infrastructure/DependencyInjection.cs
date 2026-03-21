@@ -30,6 +30,8 @@ public static class DependencyInjection
         services.AddScoped<ILookupService, LookupService>();
         services.AddScoped<IThemeService, ThemeService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IClientService, ClientService>();
+        services.AddScoped<IContactInquiryService, ContactInquiryService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IReportService, ReportService>();

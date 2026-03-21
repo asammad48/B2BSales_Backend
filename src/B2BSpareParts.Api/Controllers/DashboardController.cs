@@ -32,4 +32,18 @@ public class DashboardController : ControllerBase
         var summary = await _dashboardService.GetSummaryAsync(request.RangeType, request.StartDate, request.EndDate, ct);
         return Ok(ApiResponse<DashboardSummaryDto>.Ok(summary));
     }
+
+    [HttpGet("overview")]
+    public async Task<ActionResult<ApiResponse<DashboardOverviewDto>>> GetOverview(
+        [FromQuery] DateRangeReportRequestDto request,
+        CancellationToken ct)
+    {
+        if (request.RangeType == RangeType.Custom && (!request.StartDate.HasValue || !request.EndDate.HasValue))
+        {
+            return BadRequest(ApiResponse<DashboardOverviewDto>.Fail("Start and end dates are required for custom range"));
+        }
+
+        var overview = await _dashboardService.GetOverviewAsync(request.RangeType, request.StartDate, request.EndDate, ct);
+        return Ok(ApiResponse<DashboardOverviewDto>.Ok(overview));
+    }
 }

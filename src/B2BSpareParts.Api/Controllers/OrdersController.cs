@@ -21,6 +21,10 @@ public class OrdersController : ControllerBase
     public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Orders.OrderListItemResponseDto>>>> GetPaged([FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Orders.OrderListItemResponseDto>>.Ok(await _orderService.GetPagedAsync(request, ct)));
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.DTOs.Orders.OrderDetailsDto>>> GetById(Guid id, CancellationToken ct)
+        => Ok(ApiResponse<B2BSpareParts.Application.DTOs.Orders.OrderDetailsDto>.Ok(await _orderService.GetByIdAsync(id, ct)));
+
     [HttpPost]
     public async Task<ActionResult<ApiResponse<Guid>>> Create([FromBody] B2BSpareParts.Application.DTOs.Orders.CreateOrderRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<Guid>.Ok(await _orderService.CreateAsync(request, ct)));
