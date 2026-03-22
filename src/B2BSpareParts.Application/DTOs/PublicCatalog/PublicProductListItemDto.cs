@@ -21,6 +21,7 @@ public class PublicProductListItemDto
     public decimal Price { get; set; }
     public string CurrencyCode { get; set; } = default!;
     public int StockQuantity { get; set; }
+    public int QuantityInHand { get; set; }
     public bool IsInStock { get; set; }
     public bool IsPriceLocked { get; set; } = true;
     public bool CanOrder { get; set; } = false;
