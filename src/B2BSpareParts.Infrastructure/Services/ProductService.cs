@@ -58,6 +58,9 @@ public class ProductService : IProductService
                 QualityType = x.QualityType,
                 DefaultSellingPrice = x.DefaultSellingPrice,
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
+                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                    ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
                 IsActive = x.IsActive,
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView

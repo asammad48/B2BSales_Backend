@@ -20,6 +20,7 @@ public class ProductListItemResponseDto
     public QualityType QualityType { get; set; }
     public decimal? DefaultSellingPrice { get; set; }
     public string? PrimaryImageUrl { get; set; }
+    public int QuantityInHand { get; set; }
     public bool IsActive { get; set; }
     public bool IsPriceLocked { get; set; }
     public bool CanOrder { get; set; }

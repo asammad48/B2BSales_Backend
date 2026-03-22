@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicShopService, PublicShopService>();
         services.AddScoped<IInventoryService, InventoryService>();
         services.AddScoped<IOrderService, OrderService>();
+        services.AddScoped<IPosService, PosService>();
         services.AddScoped<ILookupService, LookupService>();
         services.AddScoped<IThemeService, ThemeService>();
         services.AddScoped<IUserService, UserService>();

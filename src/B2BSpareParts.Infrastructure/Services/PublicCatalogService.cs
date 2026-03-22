@@ -205,11 +205,14 @@ public class PublicCatalogService : IPublicCatalogService
                 Price = x.DefaultSellingPrice,
                 CurrencyCode = x.Tenant!.BaseCurrency!.Code,
                 StockQuantity = x.TrackingType == TrackingType.Serialized
-                    ? _db.SerializedInventoryUnits.Count(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
-                    : _db.ShopInventories.Where(i => i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
+                    ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
+                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                    ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
                 IsInStock = x.TrackingType == TrackingType.Serialized
-                    ? _db.SerializedInventoryUnits.Any(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
-                    : _db.ShopInventories.Any(i => i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
+                    ? _db.SerializedInventoryUnits.Any(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Any(i => i.TenantId == tenantId && i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView,
                 Slug = null // Field not yet implemented in Product entity
@@ -254,11 +257,14 @@ public class PublicCatalogService : IPublicCatalogService
                 Price = x.DefaultSellingPrice,
                 CurrencyCode = x.Tenant!.BaseCurrency!.Code,
                 StockQuantity = x.TrackingType == TrackingType.Serialized
-                    ? _db.SerializedInventoryUnits.Count(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
-                    : _db.ShopInventories.Where(i => i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
+                    ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
+                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                    ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
                 IsInStock = x.TrackingType == TrackingType.Serialized
-                    ? _db.SerializedInventoryUnits.Any(u => u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
-                    : _db.ShopInventories.Any(i => i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
+                    ? _db.SerializedInventoryUnits.Any(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
+                    : _db.ShopInventories.Any(i => i.TenantId == tenantId && i.ProductId == x.Id && i.QuantityOnHand > 0 && !i.IsDeleted),
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView,
                 Slug = null, // Field not yet implemented in Product entity
