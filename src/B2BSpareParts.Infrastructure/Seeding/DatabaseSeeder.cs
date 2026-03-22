@@ -37,8 +37,8 @@ public class DatabaseSeeder
         {
             Name = "Demo Mobile Parts",
             Code = ApiConstants.DefaultTenantCode,
-            BaseCurrencyId = yuan.Id,
-            DefaultLanguageId = english.Id
+            DefaultLanguageId = english.Id,
+            DefaultSellingCurrencyId = euro.Id
         };
         _db.Tenants.Add(tenant);
         await _db.SaveChangesAsync(ct);
@@ -119,7 +119,8 @@ public class DatabaseSeeder
             Specifications = "128GB / Blue / PTA Approved",
             LowStockThreshold = 2,
             IsFeatured = true,
-            IsPublicVisible = true
+            IsPublicVisible = true,
+            BaseCurrencyId = euro.Id
         };
         var a50Screen = new Product
         {
@@ -142,7 +143,8 @@ public class DatabaseSeeder
             LongDescription = "Demo OLED screen product with quantity stock.",
             Specifications = "OEM / Black / 7 day checking warranty",
             LowStockThreshold = 10,
-            IsPublicVisible = true
+            IsPublicVisible = true,
+            BaseCurrencyId = euro.Id
         };
         var adhesive = new Product
         {
@@ -164,7 +166,8 @@ public class DatabaseSeeder
             LongDescription = "Demo accessory product.",
             Specifications = "Single strip adhesive",
             LowStockThreshold = 20,
-            IsPublicVisible = true
+            IsPublicVisible = true,
+            BaseCurrencyId = euro.Id
         };
 
         _db.Products.AddRange(iphoneProduct, a50Screen, adhesive);

@@ -294,7 +294,7 @@ public class OrderService : IOrderService
             TenantId = tenantId,
             ShopId = request.ShopId,
             ClientId = client.Id,
-            CurrencyId = client.PreferredCurrencyId ?? user.Tenant!.BaseCurrencyId,
+            CurrencyId = client.PreferredCurrencyId ?? user.Tenant!.DefaultSellingCurrencyId,
             ExchangeRate = 1.0m, // Simplified for now, in real world we'd fetch actual rate
             OrderNumber = $"ORD-CL-{DateTime.UtcNow:yyyyMMddHHmmss}",
             Notes = request.Notes,

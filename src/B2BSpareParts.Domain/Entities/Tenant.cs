@@ -6,7 +6,6 @@ public class Tenant : BaseEntity
 {
     public string Name { get; set; } = default!;
     public string Code { get; set; } = default!;
-    public Guid BaseCurrencyId { get; set; }
     public Guid DefaultSellingCurrencyId { get; set; }
     public Guid DefaultLanguageId { get; set; }
     public bool IsActive { get; set; } = true;
