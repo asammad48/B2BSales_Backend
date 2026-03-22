@@ -8,6 +8,7 @@ using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Documents;
 using B2BSpareParts.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF.Fluent;
 
 namespace B2BSpareParts.Infrastructure.Services;
 
