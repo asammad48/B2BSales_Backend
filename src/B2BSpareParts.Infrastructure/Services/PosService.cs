@@ -1,5 +1,6 @@
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
+using B2BSpareParts.Application.DTOs.Common;
 using B2BSpareParts.Application.DTOs.Orders.Invoices;
 using B2BSpareParts.Application.DTOs.Pos;
 using B2BSpareParts.Common;
@@ -98,7 +99,59 @@ public class PosService : IPosService
             })
             .Where(x => x.QuantityInHand > 0);
 
-        return await projected.ToPageAsync(request, ct);
+        var page = await projected.ToPageAsync(request, ct);
+        var productIds = page.Items.Select(x => x.ProductId).Distinct().ToList();
+
+        if (productIds.Count == 0)
+            return page;
+
+        var serializedBarcodes = await _db.SerializedInventoryUnits
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId &&
+                        productIds.Contains(x.ProductId) &&
+                        x.Status == SerializedUnitStatus.InStock &&
+                        !x.IsDeleted &&
+                        (!request.ShopId.HasValue || x.ShopId == request.ShopId.Value))
+            .Select(x => new
+            {
+                x.ProductId,
+                x.UnitBarcode,
+                x.Imei1,
+                x.Imei2
+            })
+            .ToListAsync(ct);
+
+        var serializedBarcodeLookup = serializedBarcodes
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => new ProductBarcodeDto
+                {
+                    Barcode = x.UnitBarcode,
+                    Imei1 = x.Imei1 ?? string.Empty,
+                    Imei2 = x.Imei2 ?? string.Empty
+                }).ToList());
+
+        foreach (var item in page.Items)
+        {
+            if (serializedBarcodeLookup.TryGetValue(item.ProductId, out var barcodes))
+            {
+                item.Barcodes = barcodes;
+                continue;
+            }
+
+            item.Barcodes =
+            [
+                new ProductBarcodeDto
+                {
+                    Barcode = item.Barcode ?? string.Empty,
+                    Imei1 = string.Empty,
+                    Imei2 = string.Empty
+                }
+            ];
+        }
+
+        return page;
     }
 
     public async Task<CreatePosOrderResponseDto> CreateOrderAsync(CreatePosOrderRequestDto request, CancellationToken ct = default)
