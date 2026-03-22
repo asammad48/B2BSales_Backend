@@ -1,3 +1,5 @@
+using B2BSpareParts.Application.DTOs.Common;
+
 namespace B2BSpareParts.Application.DTOs.Pos;
 
 public class PosProductListItemDto
@@ -6,6 +8,7 @@ public class PosProductListItemDto
     public string ProductName { get; set; } = default!;
     public string Sku { get; set; } = default!;
     public string? Barcode { get; set; }
+    public List<ProductBarcodeDto> Barcodes { get; set; } = [];
     public string? BrandName { get; set; }
     public string? ModelName { get; set; }
     public string? PartTypeName { get; set; }

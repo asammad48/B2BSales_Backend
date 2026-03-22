@@ -1,4 +1,4 @@
-using B2BSpareParts.Domain.Enums;
+using B2BSpareParts.Application.DTOs.Common;
 
 namespace B2BSpareParts.Application.DTOs.Inventory;
 
@@ -14,6 +14,7 @@ public class InventoryListItemResponseDto
     public string? ModelName { get; set; }
     public string Sku { get; set; } = default!;
     public string? Barcode { get; set; }
+    public List<ProductBarcodeDto> Barcodes { get; set; } = [];
     public string TrackingType { get; set; } = default!;
     public int QuantityOnHand { get; set; }
     public int ReservedQuantity { get; set; }
