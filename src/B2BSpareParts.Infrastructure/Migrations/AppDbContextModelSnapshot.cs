@@ -551,6 +551,9 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SelectedUnitBarcodesJson")
+                        .HasColumnType("text");
+
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");
 
