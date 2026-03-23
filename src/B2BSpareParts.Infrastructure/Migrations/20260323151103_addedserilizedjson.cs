@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace B2BSpareParts.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class addedserilizedjson : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -51,6 +51,28 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         column: x => x.ParentCategoryId,
                         principalTable: "Categories",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ContactInquiries",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    Email = table.Column<string>(type: "text", nullable: false),
+                    MobileNo = table.Column<string>(type: "text", nullable: false),
+                    Subject = table.Column<string>(type: "text", nullable: false),
+                    Message = table.Column<string>(type: "text", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    IsRead = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ContactInquiries", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -268,9 +290,10 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Code = table.Column<string>(type: "text", nullable: false),
-                    BaseCurrencyId = table.Column<Guid>(type: "uuid", nullable: false),
+                    DefaultSellingCurrencyId = table.Column<Guid>(type: "uuid", nullable: false),
                     DefaultLanguageId = table.Column<Guid>(type: "uuid", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    BaseCurrencyId = table.Column<Guid>(type: "uuid", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false)
@@ -281,6 +304,11 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     table.ForeignKey(
                         name: "FK_Tenants_Currencies_BaseCurrencyId",
                         column: x => x.BaseCurrencyId,
+                        principalTable: "Currencies",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Tenants_Currencies_DefaultSellingCurrencyId",
+                        column: x => x.DefaultSellingCurrencyId,
                         principalTable: "Currencies",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -309,6 +337,8 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     Specifications = table.Column<string>(type: "text", nullable: true),
                     TrackingType = table.Column<int>(type: "integer", nullable: false),
                     QualityType = table.Column<int>(type: "integer", nullable: false),
+                    BaseCurrencyId = table.Column<Guid>(type: "uuid", nullable: false),
+                    BasePrice = table.Column<decimal>(type: "numeric", nullable: false),
                     DefaultBuyingPrice = table.Column<decimal>(type: "numeric", nullable: false),
                     DefaultSellingPrice = table.Column<decimal>(type: "numeric", nullable: false),
                     DefaultPricingMode = table.Column<int>(type: "integer", nullable: false),
@@ -316,6 +346,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     WarrantyDays = table.Column<int>(type: "integer", nullable: false),
                     LowStockThreshold = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    IsPublicVisible = table.Column<bool>(type: "boolean", nullable: false),
                     IsFeatured = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -337,6 +368,12 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
+                        name: "FK_Products_Currencies_BaseCurrencyId",
+                        column: x => x.BaseCurrencyId,
+                        principalTable: "Currencies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
                         name: "FK_Products_DeviceModels_ModelId",
                         column: x => x.ModelId,
                         principalTable: "DeviceModels",
@@ -346,6 +383,12 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         column: x => x.PartTypeId,
                         principalTable: "PartTypes",
                         principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Products_Tenants_TenantId",
+                        column: x => x.TenantId,
+                        principalTable: "Tenants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -631,6 +674,12 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         column: x => x.ShopId,
                         principalTable: "Shops",
                         principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_Users_Tenants_TenantId",
+                        column: x => x.TenantId,
+                        principalTable: "Tenants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -645,6 +694,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     BaseUnitPrice = table.Column<decimal>(type: "numeric", nullable: false),
                     DiscountAmount = table.Column<decimal>(type: "numeric", nullable: false),
                     LineTotal = table.Column<decimal>(type: "numeric", nullable: false),
+                    SelectedUnitBarcodesJson = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false)
@@ -841,6 +891,11 @@ namespace B2BSpareParts.Infrastructure.Migrations
                 column: "RelatedProductId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Products_BaseCurrencyId",
+                table: "Products",
+                column: "BaseCurrencyId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Products_BrandId",
                 table: "Products",
                 column: "BrandId");
@@ -951,6 +1006,11 @@ namespace B2BSpareParts.Infrastructure.Migrations
                 column: "DefaultLanguageId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Tenants_DefaultSellingCurrencyId",
+                table: "Tenants",
+                column: "DefaultSellingCurrencyId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Users_ShopId",
                 table: "Users",
                 column: "ShopId");
@@ -965,6 +1025,9 @@ namespace B2BSpareParts.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "ContactInquiries");
+
             migrationBuilder.DropTable(
                 name: "ExchangeRates");
 

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace B2BSpareParts.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260314232802_AddIsPublicVisibleToProduct")]
-    partial class AddIsPublicVisibleToProduct
+    [Migration("20260323151103_addedserilizedjson")]
+    partial class addedserilizedjson
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -205,6 +205,55 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.HasIndex("PreferredLanguageId");
 
                     b.ToTable("Clients");
+                });
+
+            modelBuilder.Entity("B2BSpareParts.Domain.Entities.ContactInquiry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MobileNo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ContactInquiries");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Currency", b =>
@@ -505,6 +554,9 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SelectedUnitBarcodesJson")
+                        .HasColumnType("text");
+
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");
 
@@ -601,6 +653,12 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Property<string>("Barcode")
                         .HasColumnType("text");
 
+                    b.Property<Guid>("BaseCurrencyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasColumnType("numeric");
+
                     b.Property<Guid?>("BrandId")
                         .HasColumnType("uuid");
 
@@ -676,6 +734,8 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BaseCurrencyId");
 
                     b.HasIndex("BrandId");
 
@@ -1097,7 +1157,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("BaseCurrencyId")
+                    b.Property<Guid?>("BaseCurrencyId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("Code")
@@ -1108,6 +1168,9 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("DefaultLanguageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DefaultSellingCurrencyId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsActive")
@@ -1131,6 +1194,8 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .IsUnique();
 
                     b.HasIndex("DefaultLanguageId");
+
+                    b.HasIndex("DefaultSellingCurrencyId");
 
                     b.ToTable("Tenants");
                 });
@@ -1188,7 +1253,15 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ShopId");
 
+                    b.HasOne("B2BSpareParts.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Shop");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Category", b =>
@@ -1304,6 +1377,12 @@ namespace B2BSpareParts.Infrastructure.Migrations
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Product", b =>
                 {
+                    b.HasOne("B2BSpareParts.Domain.Entities.Currency", "BaseCurrency")
+                        .WithMany()
+                        .HasForeignKey("BaseCurrencyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("B2BSpareParts.Domain.Entities.Brand", "Brand")
                         .WithMany()
                         .HasForeignKey("BrandId");
@@ -1322,6 +1401,14 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("PartTypeId");
 
+                    b.HasOne("B2BSpareParts.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BaseCurrency");
+
                     b.Navigation("Brand");
 
                     b.Navigation("Category");
@@ -1329,6 +1416,8 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Navigation("Model");
 
                     b.Navigation("PartType");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.ProductCompatibleModel", b =>
@@ -1481,9 +1570,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
                 {
                     b.HasOne("B2BSpareParts.Domain.Entities.Currency", "BaseCurrency")
                         .WithMany()
-                        .HasForeignKey("BaseCurrencyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("BaseCurrencyId");
 
                     b.HasOne("B2BSpareParts.Domain.Entities.Language", "DefaultLanguage")
                         .WithMany()
@@ -1491,9 +1578,17 @@ namespace B2BSpareParts.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("B2BSpareParts.Domain.Entities.Currency", "DefaultSellingCurrency")
+                        .WithMany()
+                        .HasForeignKey("DefaultSellingCurrencyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("BaseCurrency");
 
                     b.Navigation("DefaultLanguage");
+
+                    b.Navigation("DefaultSellingCurrency");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Order", b =>
