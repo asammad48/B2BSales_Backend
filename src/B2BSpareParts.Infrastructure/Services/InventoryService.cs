@@ -1,3 +1,4 @@
+using System.Text.Json;
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Common;
@@ -315,6 +316,87 @@ public class InventoryService : IInventoryService
     public async Task<Guid> CreateTransferAsync(CreateStockTransferRequestDto request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
+
+        if (request.SourceShopId == request.DestinationShopId)
+            throw new AppException("Source and destination shops must be different");
+
+        if (request.Items.Count == 0)
+            throw new AppException("At least one transfer item is required");
+
+        if (request.Items.Any(x => x.Quantity <= 0))
+            throw new AppException("Transfer item quantity must be greater than zero");
+
+        var requestedProductIds = request.Items.Select(x => x.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(x => x.TenantId == tenantId && requestedProductIds.Contains(x.Id) && !x.IsDeleted)
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        if (products.Count != requestedProductIds.Count)
+            throw new AppException("One or more products were not found", 404);
+
+        var quantityRequests = request.Items
+            .Where(x => products[x.ProductId].TrackingType == TrackingType.QuantityBased)
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Quantity = g.Sum(x => x.Quantity) })
+            .ToList();
+
+        if (quantityRequests.Count > 0)
+        {
+            var quantityStocks = await _db.ShopInventories
+                .Where(x => x.TenantId == tenantId &&
+                            x.ShopId == request.SourceShopId &&
+                            quantityRequests.Select(q => q.ProductId).Contains(x.ProductId) &&
+                            !x.IsDeleted)
+                .ToDictionaryAsync(x => x.ProductId, ct);
+
+            foreach (var quantityRequest in quantityRequests)
+            {
+                if (!quantityStocks.TryGetValue(quantityRequest.ProductId, out var stock) || stock.QuantityOnHand < quantityRequest.Quantity)
+                    throw new AppException($"Insufficient stock for product {quantityRequest.ProductId}", 400);
+            }
+        }
+
+        var serializedRequests = request.Items
+            .Where(x => products[x.ProductId].TrackingType == TrackingType.Serialized)
+            .Select(x => new
+            {
+                x.ProductId,
+                x.Quantity,
+                Barcodes = NormalizeBarcodes(x.Barcodes, x.Quantity, products[x.ProductId].Name)
+            })
+            .ToList();
+
+        var duplicateSerializedBarcode = serializedRequests
+            .SelectMany(x => x.Barcodes.Select(barcode => new { x.ProductId, Barcode = barcode }))
+            .GroupBy(x => new { x.ProductId, x.Barcode })
+            .FirstOrDefault(g => g.Count() > 1);
+
+        if (duplicateSerializedBarcode is not null)
+            throw new AppException($"Barcode '{duplicateSerializedBarcode.Key.Barcode}' is duplicated for the same product in this transfer", 400);
+
+        if (serializedRequests.Count > 0)
+        {
+            var serializedProductIds = serializedRequests.Select(x => x.ProductId).Distinct().ToList();
+            var requestedBarcodes = serializedRequests.SelectMany(x => x.Barcodes).Distinct().ToList();
+
+            var matchedSerializedUnits = await _db.SerializedInventoryUnits
+                .Where(x => x.TenantId == tenantId &&
+                            x.ShopId == request.SourceShopId &&
+                            serializedProductIds.Contains(x.ProductId) &&
+                            x.Status == SerializedUnitStatus.InStock &&
+                            !x.IsDeleted &&
+                            requestedBarcodes.Contains(x.UnitBarcode))
+                .Select(x => new { x.ProductId, x.UnitBarcode })
+                .ToListAsync(ct);
+
+            foreach (var serializedRequest in serializedRequests)
+            {
+                var matchedCount = matchedSerializedUnits.Count(x => x.ProductId == serializedRequest.ProductId && serializedRequest.Barcodes.Contains(x.UnitBarcode));
+                if (matchedCount != serializedRequest.Barcodes.Count)
+                    throw new AppException($"One or more serialized barcodes were not found in stock for {products[serializedRequest.ProductId].Name}", 400);
+            }
+        }
+
         var transfer = new StockTransfer
         {
             TenantId = tenantId,
@@ -325,7 +407,10 @@ public class InventoryService : IInventoryService
             Items = request.Items.Select(x => new StockTransferItem
             {
                 ProductId = x.ProductId,
-                Quantity = x.Quantity
+                Quantity = x.Quantity,
+                SelectedUnitBarcodesJson = products[x.ProductId].TrackingType == TrackingType.Serialized
+                    ? SerializeBarcodes(NormalizeBarcodes(x.Barcodes, x.Quantity, products[x.ProductId].Name))
+                    : null
             }).ToList()
         };
 
@@ -345,15 +430,59 @@ public class InventoryService : IInventoryService
         if (transfer.Status != StockTransferStatus.Draft)
             throw new AppException("Only draft transfers can be dispatched");
 
+        var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
+            .ToDictionaryAsync(x => x.Id, ct);
+
         foreach (var item in transfer.Items)
         {
+            var product = products[item.ProductId];
+            if (product.TrackingType == TrackingType.Serialized)
+            {
+                var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
+                if (selectedBarcodes is not { Count: > 0 })
+                    throw new AppException($"Barcodes are required for serialized product {product.Name}", 400);
+
+                var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, item.Quantity, product.Name);
+                var units = await _db.SerializedInventoryUnits
+                    .Where(x => x.TenantId == tenantId &&
+                                x.ShopId == transfer.SourceShopId &&
+                                x.ProductId == item.ProductId &&
+                                x.Status == SerializedUnitStatus.InStock &&
+                                !x.IsDeleted &&
+                                normalizedBarcodes.Contains(x.UnitBarcode))
+                    .ToListAsync(ct);
+
+                if (units.Count != normalizedBarcodes.Count)
+                    throw new AppException($"One or more serialized barcodes were not found in stock for {product.Name}", 400);
+
+                foreach (var unit in units)
+                {
+                    unit.ShopId = transfer.DestinationShopId;
+                    unit.Status = SerializedUnitStatus.Reserved;
+                    unit.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _db.StockMovements.Add(new StockMovement
+                    {
+                        TenantId = tenantId,
+                        ShopId = transfer.SourceShopId,
+                        ProductId = item.ProductId,
+                        SerializedInventoryUnitId = unit.Id,
+                        MovementType = StockMovementType.TransferOut,
+                        Quantity = 1,
+                        ReferenceType = nameof(StockTransfer),
+                        ReferenceId = transfer.Id,
+                        PerformedByUserId = _tenantContext.UserId
+                    });
+                }
+
+                continue;
+            }
+
             var stock = await _db.ShopInventories
-                .Include(x => x.Product)
                 .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.ShopId == transfer.SourceShopId && x.ProductId == item.ProductId && !x.IsDeleted, ct)
                 ?? throw new AppException($"Source stock not found for product {item.ProductId}");
-
-            if (stock.Product!.TrackingType == TrackingType.Serialized)
-                throw new AppException("Serialized transfer dispatch is not implemented in this starter");
 
             if (stock.QuantityOnHand < item.Quantity)
                 throw new AppException("Insufficient stock for transfer");
@@ -403,14 +532,60 @@ public class InventoryService : IInventoryService
         if (transfer.Status != StockTransferStatus.Dispatched)
             throw new AppException("Only dispatched transfers can be received");
 
+        var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
+        var products = await _db.Products
+            .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
+            .ToDictionaryAsync(x => x.Id, ct);
+
         foreach (var item in transfer.Items)
         {
+            var product = products[item.ProductId];
+            if (product.TrackingType == TrackingType.Serialized)
+            {
+                var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
+                if (selectedBarcodes is not { Count: > 0 })
+                    throw new AppException($"Barcodes are required for serialized product {product.Name}", 400);
+
+                var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, item.Quantity, product.Name);
+                var units = await _db.SerializedInventoryUnits
+                    .Where(x => x.TenantId == tenantId &&
+                                x.ShopId == transfer.DestinationShopId &&
+                                x.ProductId == item.ProductId &&
+                                x.Status == SerializedUnitStatus.Reserved &&
+                                !x.IsDeleted &&
+                                normalizedBarcodes.Contains(x.UnitBarcode))
+                    .ToListAsync(ct);
+
+                if (units.Count != normalizedBarcodes.Count)
+                    throw new AppException($"One or more serialized barcodes were not found in transit for {product.Name}", 400);
+
+                foreach (var unit in units)
+                {
+                    unit.Status = SerializedUnitStatus.InStock;
+                    unit.UpdatedAt = DateTimeOffset.UtcNow;
+
+                    _db.StockMovements.Add(new StockMovement
+                    {
+                        TenantId = tenantId,
+                        ShopId = transfer.DestinationShopId,
+                        ProductId = item.ProductId,
+                        SerializedInventoryUnitId = unit.Id,
+                        MovementType = StockMovementType.TransferIn,
+                        Quantity = 1,
+                        ReferenceType = nameof(StockTransfer),
+                        ReferenceId = transfer.Id,
+                        PerformedByUserId = _tenantContext.UserId
+                    });
+                }
+
+                continue;
+            }
+
             var stock = await _db.ShopInventories.FirstOrDefaultAsync(x =>
                 x.TenantId == tenantId && x.ShopId == transfer.DestinationShopId && x.ProductId == item.ProductId && !x.IsDeleted, ct);
 
             if (stock is null)
             {
-                var product = await _db.Products.FirstAsync(x => x.Id == item.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct);
                 stock = new ShopInventory
                 {
                     TenantId = tenantId,
@@ -538,6 +713,28 @@ public class InventoryService : IInventoryService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    private static List<string> NormalizeBarcodes(IEnumerable<string> barcodes, int expectedQuantity, string productName)
+    {
+        var normalized = barcodes
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count != expectedQuantity)
+            throw new AppException($"Barcodes count must match quantity {expectedQuantity} for {productName}", 400);
+
+        return normalized;
+    }
+
+    private static string? SerializeBarcodes(List<string>? barcodes)
+        => barcodes is { Count: > 0 } ? JsonSerializer.Serialize(barcodes) : null;
+
+    private static List<string>? DeserializeBarcodes(string? barcodesJson)
+        => string.IsNullOrWhiteSpace(barcodesJson)
+            ? null
+            : JsonSerializer.Deserialize<List<string>>(barcodesJson);
 
     private static void ValidateSerializedUnits(List<SerializedStockInUnitRequestDto> serializedUnits, int expectedQuantity, bool requireExactQuantityMatch)
     {
