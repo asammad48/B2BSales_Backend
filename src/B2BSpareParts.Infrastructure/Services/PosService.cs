@@ -1,3 +1,4 @@
+using System.Text.Json;
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Common;
@@ -185,7 +186,8 @@ public class PosService : IPosService
             .Select(g => new CreatePosOrderItemDto
             {
                 ProductId = g.Key,
-                Quantity = g.Sum(i => i.Quantity)
+                Quantity = g.Sum(i => i.Quantity),
+                Barcodes = g.SelectMany(i => i.Barcodes ?? []).ToList()
             })
             .ToList();
 
@@ -232,7 +234,8 @@ public class PosService : IPosService
         foreach (var item in aggregatedItems)
         {
             var product = products.First(x => x.Id == item.ProductId);
-            await EnsureStockAvailabilityAsync(tenantId, shop.Id, product, item.Quantity, ct);
+            var selectedBarcodes = await GetSelectedSerializedBarcodesAsync(tenantId, shop.Id, product, item, ct);
+            await EnsureStockAvailabilityAsync(tenantId, shop.Id, product, item.Quantity, ct, selectedBarcodes);
 
             order.Items.Add(new OrderItem
             {
@@ -241,7 +244,8 @@ public class PosService : IPosService
                 UnitPrice = product.DefaultSellingPrice,
                 BaseUnitPrice = product.DefaultSellingPrice,
                 LineTotal = product.DefaultSellingPrice * item.Quantity,
-                Product = product
+                Product = product,
+                SelectedUnitBarcodesJson = SerializeBarcodes(selectedBarcodes)
             });
         }
 
@@ -364,10 +368,27 @@ public class PosService : IPosService
         return shop;
     }
 
-    private async Task EnsureStockAvailabilityAsync(Guid tenantId, Guid shopId, Product product, int quantity, CancellationToken ct)
+    private async Task EnsureStockAvailabilityAsync(Guid tenantId, Guid shopId, Product product, int quantity, CancellationToken ct, List<string>? selectedBarcodes = null)
     {
         if (product.TrackingType == TrackingType.Serialized)
         {
+            if (selectedBarcodes is { Count: > 0 })
+            {
+                var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, quantity, product.Name);
+                var selectedCount = await _db.SerializedInventoryUnits.CountAsync(x =>
+                    x.TenantId == tenantId &&
+                    x.ShopId == shopId &&
+                    x.ProductId == product.Id &&
+                    x.Status == SerializedUnitStatus.InStock &&
+                    !x.IsDeleted &&
+                    normalizedBarcodes.Contains(x.UnitBarcode), ct);
+
+                if (selectedCount < quantity)
+                    throw new AppException($"Insufficient serialized stock for {product.Name}", 400);
+
+                return;
+            }
+
             var availableCount = await _db.SerializedInventoryUnits.CountAsync(x =>
                 x.TenantId == tenantId &&
                 x.ShopId == shopId &&
@@ -395,16 +416,30 @@ public class PosService : IPosService
     {
         if (product.TrackingType == TrackingType.Serialized)
         {
-            var units = await _db.SerializedInventoryUnits
+            var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
+            var unitsQuery = _db.SerializedInventoryUnits
                 .Where(x =>
                     x.TenantId == order.TenantId &&
                     x.ShopId == order.ShopId &&
                     x.ProductId == item.ProductId &&
                     x.Status == SerializedUnitStatus.InStock &&
                     !x.IsDeleted)
-                .OrderBy(x => x.CreatedAt)
-                .Take(item.Quantity)
-                .ToListAsync(ct);
+                .OrderBy(x => x.CreatedAt);
+
+            List<SerializedInventoryUnit> units;
+            if (selectedBarcodes is { Count: > 0 })
+            {
+                var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, item.Quantity, product.Name);
+                units = await unitsQuery
+                    .Where(x => normalizedBarcodes.Contains(x.UnitBarcode))
+                    .ToListAsync(ct);
+            }
+            else
+            {
+                units = await unitsQuery
+                    .Take(item.Quantity)
+                    .ToListAsync(ct);
+            }
 
             if (units.Count < item.Quantity)
                 throw new AppException($"Insufficient serialized stock for {product.Name}", 400);
@@ -480,6 +515,53 @@ public class PosService : IPosService
             }
         }
     }
+
+
+    private async Task<List<string>?> GetSelectedSerializedBarcodesAsync(Guid tenantId, Guid shopId, Product product, CreatePosOrderItemDto item, CancellationToken ct)
+    {
+        if (product.TrackingType != TrackingType.Serialized)
+            return null;
+
+        if (item.Barcodes == null || item.Barcodes.Count == 0)
+            throw new AppException($"Barcodes are required for serialized product {product.Name}", 400);
+
+        var normalizedBarcodes = NormalizeBarcodes(item.Barcodes, item.Quantity, product.Name);
+        var matchedCount = await _db.SerializedInventoryUnits.CountAsync(x =>
+            x.TenantId == tenantId &&
+            x.ShopId == shopId &&
+            x.ProductId == product.Id &&
+            x.Status == SerializedUnitStatus.InStock &&
+            !x.IsDeleted &&
+            normalizedBarcodes.Contains(x.UnitBarcode), ct);
+
+        if (matchedCount != normalizedBarcodes.Count)
+            throw new AppException($"One or more serialized barcodes were not found in stock for {product.Name}", 400);
+
+        return normalizedBarcodes;
+    }
+
+    private static List<string> NormalizeBarcodes(IEnumerable<string> barcodes, int expectedQuantity, string productName)
+    {
+        var normalized = barcodes
+            .Select(x => x?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count != expectedQuantity)
+            throw new AppException($"Barcodes count must match quantity {expectedQuantity} for {productName}", 400);
+
+        return normalized;
+    }
+
+    private static string? SerializeBarcodes(List<string>? barcodes)
+        => barcodes is { Count: > 0 } ? JsonSerializer.Serialize(barcodes) : null;
+
+    private static List<string>? DeserializeBarcodes(string? barcodesJson)
+        => string.IsNullOrWhiteSpace(barcodesJson)
+            ? null
+            : JsonSerializer.Deserialize<List<string>>(barcodesJson);
 
     private CreatePosOrderResponseDto BuildCreateOrderResponse(Order order, string shopName, string? clientName, string currencyCode, ThemeSetting? theme)
     {

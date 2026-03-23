@@ -11,6 +11,7 @@ public class OrderItem : BaseEntity
     public decimal BaseUnitPrice { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal LineTotal { get; set; }
+    public string? SelectedUnitBarcodesJson { get; set; }
 
     public Order? Order { get; set; }
     public Product? Product { get; set; }

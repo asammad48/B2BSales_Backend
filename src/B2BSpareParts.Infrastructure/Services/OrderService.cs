@@ -1,3 +1,4 @@
+using System.Text.Json;
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Orders;
@@ -85,8 +86,6 @@ public class OrderService : IOrderService
             TotalAmount = order.TotalAmount,
             Notes = order.Notes,
             CreatedAt = order.CreatedAt,
-            // In a real system, you'd track when it was marked ready/completed separately if needed.
-            // Using UpdatedAt as a fallback for now if status is Ready/Completed.
             ReadyAt = order.Status >= OrderStatus.ReadyForPickup ? order.UpdatedAt : null,
             CompletedAt = order.Status == OrderStatus.Completed ? order.UpdatedAt : null,
             Items = order.Items.Select(i => new OrderDetailsItemDto
@@ -106,7 +105,6 @@ public class OrderService : IOrderService
     {
         var tenantId = _tenantContext.TenantId;
 
-        // Enforce that a client can only see their own orders
         if (_tenantContext.Role == UserRoles.Client)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == _tenantContext.UserId && u.TenantId == tenantId && !u.IsDeleted, ct)
@@ -154,7 +152,6 @@ public class OrderService : IOrderService
     {
         var tenantId = _tenantContext.TenantId;
 
-        // Enforce that a client can only see their own summary
         if (_tenantContext.Role == UserRoles.Client)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == _tenantContext.UserId && u.TenantId == tenantId && !u.IsDeleted, ct)
@@ -210,29 +207,10 @@ public class OrderService : IOrderService
         foreach (var item in request.Items)
         {
             var product = products.FirstOrDefault(x => x.Id == item.ProductId) ?? throw new AppException($"Product {item.ProductId} not found");
+            ValidateRequestedQuantity(item.Quantity, product.Name);
 
-            // No stock is deducted on placement. We only verify there appears to be stock right now.
-            if (product.TrackingType == TrackingType.Serialized)
-            {
-                var availableCount = await _db.SerializedInventoryUnits.CountAsync(x =>
-                    x.TenantId == tenantId &&
-                    x.ShopId == request.ShopId &&
-                    x.ProductId == item.ProductId &&
-                    x.Status == SerializedUnitStatus.InStock &&
-                    !x.IsDeleted, ct);
-                if (availableCount < item.Quantity)
-                    throw new AppException($"Insufficient serialized stock for {product.Name}");
-            }
-            else
-            {
-                var stock = await _db.ShopInventories.FirstOrDefaultAsync(x =>
-                    x.TenantId == tenantId &&
-                    x.ShopId == request.ShopId &&
-                    x.ProductId == item.ProductId &&
-                    !x.IsDeleted, ct);
-                if (stock is null || stock.QuantityOnHand < item.Quantity)
-                    throw new AppException($"Insufficient stock for {product.Name}");
-            }
+            var selectedBarcodes = await GetSelectedSerializedBarcodesForCreateAsync(product, request.ShopId, item, tenantId, ct);
+            await EnsureStockAvailableForOrderItemAsync(product, request.ShopId, item.Quantity, tenantId, ct, selectedBarcodes);
 
             order.Items.Add(new OrderItem
             {
@@ -240,7 +218,8 @@ public class OrderService : IOrderService
                 Quantity = item.Quantity,
                 UnitPrice = product.DefaultSellingPrice,
                 BaseUnitPrice = product.DefaultSellingPrice,
-                LineTotal = product.DefaultSellingPrice * item.Quantity
+                LineTotal = product.DefaultSellingPrice * item.Quantity,
+                SelectedUnitBarcodesJson = SerializeBarcodes(selectedBarcodes)
             });
         }
 
@@ -289,20 +268,12 @@ public class OrderService : IOrderService
             .Where(x => productIds.Contains(x.Id) && x.TenantId == tenantId && !x.IsDeleted)
             .ToListAsync(ct);
 
-        var order = new Order
-        {
-            TenantId = tenantId,
-            ShopId = request.ShopId,
-            ClientId = client.Id,
-            CurrencyId = client.PreferredCurrencyId ?? user.Tenant!.DefaultSellingCurrencyId,
-            ExchangeRate = 1.0m, // Simplified for now, in real world we'd fetch actual rate
-            OrderNumber = $"ORD-CL-{DateTime.UtcNow:yyyyMMddHHmmss}",
-            Notes = request.Notes,
-            PlacedByUserId = userId,
-            Status = OrderStatus.Pending
-        };
+        var requestedItems = request.Items
+            .GroupBy(x => x.ProductId)
+            .Select(g => new RequestedOrderItem(g.Key, g.Sum(x => x.Quantity)))
+            .ToList();
 
-        foreach (var item in request.Items)
+        foreach (var item in requestedItems)
         {
             var product = products.FirstOrDefault(x => x.Id == item.ProductId)
                           ?? throw new AppException($"Product {item.ProductId} not found", 404);
@@ -310,28 +281,47 @@ public class OrderService : IOrderService
             if (!product.IsActive || !product.IsPublicVisible)
                 throw new AppException($"Product {product.Name} is not available for order", 400);
 
-            if (item.Quantity <= 0)
-                throw new AppException($"Quantity for product {product.Name} must be greater than zero", 400);
+            ValidateRequestedQuantity(item.Quantity, product.Name);
+        }
 
-            // Duplicate product IDs in the request: we could merge them or reject. Re-use existing logic of adding separate items or merging.
-            // Following requirement "reject duplicate product entries or merge them" - let's merge them implicitly by checking if already added.
-            var existingItem = order.Items.FirstOrDefault(i => i.ProductId == item.ProductId);
-            if (existingItem != null)
+        var autoSelectedSerializedBarcodes = await GetAutoSelectedSerializedBarcodesAsync(
+            products.Where(x => x.TrackingType == TrackingType.Serialized).ToList(),
+            request.ShopId,
+            requestedItems,
+            tenantId,
+            ct);
+
+        var order = new Order
+        {
+            TenantId = tenantId,
+            ShopId = request.ShopId,
+            ClientId = client.Id,
+            CurrencyId = client.PreferredCurrencyId ?? user.Tenant!.DefaultSellingCurrencyId,
+            ExchangeRate = 1.0m,
+            OrderNumber = $"ORD-CL-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            Notes = request.Notes,
+            PlacedByUserId = userId,
+            Status = OrderStatus.Pending
+        };
+
+        foreach (var item in requestedItems)
+        {
+            var product = products.First(x => x.Id == item.ProductId);
+            var selectedBarcodes = autoSelectedSerializedBarcodes.TryGetValue(item.ProductId, out var barcodes)
+                ? barcodes
+                : null;
+
+            await EnsureStockAvailableForOrderItemAsync(product, request.ShopId, item.Quantity, tenantId, ct, selectedBarcodes);
+
+            order.Items.Add(new OrderItem
             {
-                existingItem.Quantity += item.Quantity;
-                existingItem.LineTotal = existingItem.UnitPrice * existingItem.Quantity;
-            }
-            else
-            {
-                order.Items.Add(new OrderItem
-                {
-                    ProductId = product.Id,
-                    Quantity = item.Quantity,
-                    UnitPrice = product.DefaultSellingPrice,
-                    BaseUnitPrice = product.DefaultSellingPrice,
-                    LineTotal = product.DefaultSellingPrice * item.Quantity
-                });
-            }
+                ProductId = product.Id,
+                Quantity = item.Quantity,
+                UnitPrice = product.DefaultSellingPrice,
+                BaseUnitPrice = product.DefaultSellingPrice,
+                LineTotal = product.DefaultSellingPrice * item.Quantity,
+                SelectedUnitBarcodesJson = SerializeBarcodes(selectedBarcodes)
+            });
         }
 
         order.Subtotal = order.Items.Sum(x => x.LineTotal);
@@ -362,11 +352,16 @@ public class OrderService : IOrderService
     public async Task MarkReadyAsync(Guid id, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
-        var order = await _db.Orders.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
+        var order = await _db.Orders
+            .Include(x => x.Items)
+            .ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
                     ?? throw new AppException("Order not found", 404);
 
         if (order.Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.UnableToFulfill)
             throw new AppException("Order cannot be marked ready in its current state");
+
+        await EnsureOrderCanBeFulfilledAsync(order, tenantId, ct);
 
         order.Status = OrderStatus.ReadyForPickup;
         order.PreparedByUserId = _tenantContext.UserId;
@@ -389,6 +384,7 @@ public class OrderService : IOrderService
         var tenantId = _tenantContext.TenantId;
         var order = await _db.Orders
             .Include(x => x.Items)
+            .ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
             ?? throw new AppException("Order not found", 404);
 
@@ -400,22 +396,15 @@ public class OrderService : IOrderService
 
         foreach (var item in order.Items)
         {
-            var product = await _db.Products.FirstAsync(x => x.Id == item.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct);
+            var product = item.Product ?? await _db.Products.FirstAsync(x => x.Id == item.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct);
             if (product.TrackingType == TrackingType.Serialized)
             {
-                var units = await _db.SerializedInventoryUnits
-                    .Where(x => x.TenantId == tenantId && x.ShopId == order.ShopId && x.ProductId == item.ProductId && x.Status == SerializedUnitStatus.InStock && !x.IsDeleted)
-                    .Take(item.Quantity)
-                    .ToListAsync(ct);
+                var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
+                var units = await GetSerializedUnitsForCompletionAsync(order.ShopId, item.ProductId, item.Quantity, tenantId, selectedBarcodes, ct);
 
                 if (units.Count < item.Quantity)
                 {
-                    order.Status = OrderStatus.UnableToFulfill;
-                    order.Notes = string.IsNullOrWhiteSpace(order.Notes)
-                        ? $"Unable to fulfill at pickup confirmation due to insufficient serialized stock for {product.Name}."
-                        : order.Notes + $" | Unable to fulfill: insufficient serialized stock for {product.Name}.";
-                    order.UpdatedAt = DateTimeOffset.UtcNow;
-                    await _db.SaveChangesAsync(ct);
+                    await MoveOrderToUnableToFulfillAsync(order, product, "serialized stock", ct);
                     throw new AppException($"Order moved to UnableToFulfill. Insufficient serialized stock for {product.Name}.");
                 }
 
@@ -445,12 +434,7 @@ public class OrderService : IOrderService
 
                 if (stock.QuantityOnHand < item.Quantity)
                 {
-                    order.Status = OrderStatus.UnableToFulfill;
-                    order.Notes = string.IsNullOrWhiteSpace(order.Notes)
-                        ? $"Unable to fulfill at pickup confirmation due to insufficient stock for {product.Name}."
-                        : order.Notes + $" | Unable to fulfill: insufficient stock for {product.Name}.";
-                    order.UpdatedAt = DateTimeOffset.UtcNow;
-                    await _db.SaveChangesAsync(ct);
+                    await MoveOrderToUnableToFulfillAsync(order, product, "stock", ct);
                     throw new AppException($"Order moved to UnableToFulfill. Insufficient stock for {product.Name}.");
                 }
 
@@ -500,11 +484,15 @@ public class OrderService : IOrderService
     public async Task MarkUnableToFulfillAsync(Guid id, string? reason = null, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
-        var order = await _db.Orders.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
+        var order = await _db.Orders
+            .Include(x => x.Items)
+            .ThenInclude(i => i.Product)
+            .FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId && !x.IsDeleted, ct)
                     ?? throw new AppException("Order not found", 404);
 
         if (order.Status == OrderStatus.Completed)
             throw new AppException("Completed order cannot be moved to UnableToFulfill");
+
 
         order.Status = OrderStatus.UnableToFulfill;
         order.Notes = string.IsNullOrWhiteSpace(reason)
@@ -523,4 +511,181 @@ public class OrderService : IOrderService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    private async Task<List<string>?> GetSelectedSerializedBarcodesForCreateAsync(Product product, Guid shopId, CreateOrderItemRequestDto item, Guid tenantId, CancellationToken ct)
+    {
+        if (product.TrackingType != TrackingType.Serialized)
+            return null;
+
+        if (item.Barcodes == null || item.Barcodes.Count == 0)
+            throw new AppException($"Barcodes are required for serialized product {product.Name}", 400);
+
+        var normalizedBarcodes = NormalizeBarcodes(item.Barcodes, item.Quantity, product.Name);
+        var matchedCount = await _db.SerializedInventoryUnits.CountAsync(x =>
+            x.TenantId == tenantId &&
+            x.ShopId == shopId &&
+            x.ProductId == item.ProductId &&
+            x.Status == SerializedUnitStatus.InStock &&
+            !x.IsDeleted &&
+            normalizedBarcodes.Contains(x.UnitBarcode), ct);
+
+        if (matchedCount != normalizedBarcodes.Count)
+            throw new AppException($"One or more serialized barcodes were not found in stock for {product.Name}", 400);
+
+        return normalizedBarcodes;
+    }
+
+    private async Task<Dictionary<Guid, List<string>>> GetAutoSelectedSerializedBarcodesAsync(
+        List<Product> serializedProducts,
+        Guid shopId,
+        List<RequestedOrderItem> requestedItems,
+        Guid tenantId,
+        CancellationToken ct)
+    {
+        var result = new Dictionary<Guid, List<string>>();
+        if (serializedProducts.Count == 0)
+            return result;
+
+        var serializedProductIds = serializedProducts.Select(x => x.Id).ToHashSet();
+        var requestedSerializedItems = requestedItems.Where(x => serializedProductIds.Contains(x.ProductId)).ToList();
+        if (requestedSerializedItems.Count == 0)
+            return result;
+
+        var serializedUnits = await _db.SerializedInventoryUnits
+            .Where(x => x.TenantId == tenantId && x.ShopId == shopId && serializedProductIds.Contains(x.ProductId) && x.Status == SerializedUnitStatus.InStock && !x.IsDeleted)
+            .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => x.UnitBarcode)
+            .Select(x => new { x.ProductId, x.UnitBarcode })
+            .ToListAsync(ct);
+
+        foreach (var item in requestedSerializedItems)
+        {
+            var selected = serializedUnits
+                .Where(x => x.ProductId == item.ProductId)
+                .Take(item.Quantity)
+                .Select(x => x.UnitBarcode)
+                .ToList();
+
+            var product = serializedProducts.First(x => x.Id == item.ProductId);
+            if (selected.Count < item.Quantity)
+                throw new AppException($"Insufficient serialized stock for {product.Name}", 400);
+
+            result[item.ProductId] = selected;
+        }
+
+        return result;
+    }
+
+    private async Task EnsureOrderCanBeFulfilledAsync(Order order, Guid tenantId, CancellationToken ct)
+    {
+        foreach (var item in order.Items)
+        {
+            var product = item.Product ?? await _db.Products.FirstAsync(x => x.Id == item.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct);
+            var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
+            await EnsureStockAvailableForOrderItemAsync(product, order.ShopId, item.Quantity, tenantId, ct, selectedBarcodes);
+        }
+    }
+
+    private async Task EnsureStockAvailableForOrderItemAsync(Product product, Guid shopId, int quantity, Guid tenantId, CancellationToken ct, List<string>? selectedBarcodes = null)
+    {
+        if (product.TrackingType == TrackingType.Serialized)
+        {
+            if (selectedBarcodes is { Count: > 0 })
+            {
+                var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, quantity, product.Name);
+                var selectedCount = await _db.SerializedInventoryUnits.CountAsync(x =>
+                    x.TenantId == tenantId &&
+                    x.ShopId == shopId &&
+                    x.ProductId == product.Id &&
+                    x.Status == SerializedUnitStatus.InStock &&
+                    !x.IsDeleted &&
+                    normalizedBarcodes.Contains(x.UnitBarcode), ct);
+
+                if (selectedCount < quantity)
+                    throw new AppException($"Insufficient serialized stock for {product.Name}", 400);
+
+                return;
+            }
+
+            var availableCount = await _db.SerializedInventoryUnits.CountAsync(x =>
+                x.TenantId == tenantId &&
+                x.ShopId == shopId &&
+                x.ProductId == product.Id &&
+                x.Status == SerializedUnitStatus.InStock &&
+                !x.IsDeleted, ct);
+            if (availableCount < quantity)
+                throw new AppException($"Insufficient serialized stock for {product.Name}", 400);
+
+            return;
+        }
+
+        var stock = await _db.ShopInventories.FirstOrDefaultAsync(x =>
+            x.TenantId == tenantId &&
+            x.ShopId == shopId &&
+            x.ProductId == product.Id &&
+            !x.IsDeleted, ct);
+        if (stock is null || stock.QuantityOnHand < quantity)
+            throw new AppException($"Insufficient stock for {product.Name}", 400);
+    }
+
+    private async Task<List<SerializedInventoryUnit>> GetSerializedUnitsForCompletionAsync(Guid shopId, Guid productId, int quantity, Guid tenantId, List<string>? selectedBarcodes, CancellationToken ct)
+    {
+        if (selectedBarcodes is { Count: > 0 })
+        {
+            var normalizedBarcodes = NormalizeBarcodes(selectedBarcodes, quantity, productId.ToString());
+            return await _db.SerializedInventoryUnits
+                .Where(x => x.TenantId == tenantId && x.ShopId == shopId && x.ProductId == productId && x.Status == SerializedUnitStatus.InStock && !x.IsDeleted && normalizedBarcodes.Contains(x.UnitBarcode))
+                .OrderBy(x => x.CreatedAt)
+                .ThenBy(x => x.UnitBarcode)
+                .ToListAsync(ct);
+        }
+
+        return await _db.SerializedInventoryUnits
+            .Where(x => x.TenantId == tenantId && x.ShopId == shopId && x.ProductId == productId && x.Status == SerializedUnitStatus.InStock && !x.IsDeleted)
+            .OrderBy(x => x.CreatedAt)
+            .ThenBy(x => x.UnitBarcode)
+            .Take(quantity)
+            .ToListAsync(ct);
+    }
+
+    private async Task MoveOrderToUnableToFulfillAsync(Order order, Product product, string stockLabel, CancellationToken ct)
+    {
+        order.Status = OrderStatus.UnableToFulfill;
+        order.Notes = string.IsNullOrWhiteSpace(order.Notes)
+            ? $"Unable to fulfill at pickup confirmation due to insufficient {stockLabel} for {product.Name}."
+            : order.Notes + $" | Unable to fulfill: insufficient {stockLabel} for {product.Name}.";
+        order.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private static void ValidateRequestedQuantity(int quantity, string productName)
+    {
+        if (quantity <= 0)
+            throw new AppException($"Quantity for product {productName} must be greater than zero", 400);
+    }
+
+    private static List<string> NormalizeBarcodes(IEnumerable<string> barcodes, int expectedQuantity, string productName)
+    {
+        var normalized = barcodes
+            .Select(x => x?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (normalized.Count != expectedQuantity)
+            throw new AppException($"Barcodes count must match quantity {expectedQuantity} for {productName}", 400);
+
+        return normalized;
+    }
+
+    private static string? SerializeBarcodes(List<string>? barcodes)
+        => barcodes is { Count: > 0 } ? JsonSerializer.Serialize(barcodes) : null;
+
+    private static List<string>? DeserializeBarcodes(string? barcodesJson)
+        => string.IsNullOrWhiteSpace(barcodesJson)
+            ? null
+            : JsonSerializer.Deserialize<List<string>>(barcodesJson);
+
+    private sealed record RequestedOrderItem(Guid ProductId, int Quantity);
 }
