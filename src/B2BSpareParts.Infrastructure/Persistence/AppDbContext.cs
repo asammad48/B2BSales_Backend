@@ -64,5 +64,17 @@ public class AppDbContext : DbContext
             .HasOne(x => x.StockTransfer)
             .WithMany(x => x.Items)
             .HasForeignKey(x => x.StockTransferId);
+
+        modelBuilder.Entity<StockTransfer>()
+            .HasOne(x => x.SourceShop)
+            .WithMany()
+            .HasForeignKey(x => x.SourceShopId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTransfer>()
+            .HasOne(x => x.DestinationShop)
+            .WithMany()
+            .HasForeignKey(x => x.DestinationShopId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
