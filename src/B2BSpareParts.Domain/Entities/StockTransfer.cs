@@ -13,5 +13,7 @@ public class StockTransfer : TenantEntity
     public Guid? DispatchedByUserId { get; set; }
     public Guid? ReceivedByUserId { get; set; }
 
+    public Shop? SourceShop { get; set; }
+    public Shop? DestinationShop { get; set; }
     public ICollection<StockTransferItem> Items { get; set; } = new List<StockTransferItem>();
 }
