@@ -181,6 +181,68 @@ public class InventoryService : IInventoryService
         };
     }
 
+
+
+    public async Task<PageResponse<StockTransferListItemResponseDto>> GetTransfersAsync(PageRequest request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var search = request.Search?.Trim().ToLower();
+
+        var query = _db.StockTransfers
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.Product)
+            .Include(x => x.SourceShop)
+            .Include(x => x.DestinationShop)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(x =>
+                x.SourceShop!.Name.ToLower().Contains(search) ||
+                x.DestinationShop!.Name.ToLower().Contains(search) ||
+                (x.Notes != null && x.Notes.ToLower().Contains(search)) ||
+                x.Status.ToString().ToLower().Contains(search) ||
+                x.Items.Any(i => i.Product!.Name.ToLower().Contains(search) || i.Product.Sku.ToLower().Contains(search)));
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(x => x.CreatedAt)
+            .Skip((request.PageNumber - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(x => new StockTransferListItemResponseDto
+            {
+                Id = x.Id,
+                SourceShopId = x.SourceShopId,
+                SourceShopName = x.SourceShop!.Name,
+                DestinationShopId = x.DestinationShopId,
+                DestinationShopName = x.DestinationShop!.Name,
+                Status = x.Status,
+                Notes = x.Notes,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                Items = x.Items.Select(i => new StockTransferItemResponseDto
+                {
+                    ProductId = i.ProductId,
+                    ProductName = i.Product!.Name,
+                    Quantity = i.Quantity,
+                    Barcodes = DeserializeBarcodes(i.SelectedUnitBarcodesJson) ?? []
+                }).ToList()
+            })
+            .ToListAsync(ct);
+
+        return new PageResponse<StockTransferListItemResponseDto>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize
+        };
+    }
+
     public async Task StockInAsync(StockInRequestDto request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
@@ -419,7 +481,7 @@ public class InventoryService : IInventoryService
         return transfer.Id;
     }
 
-    public async Task DispatchTransferAsync(Guid transferId, CancellationToken ct = default)
+    public async Task DispatchTransferAsync(Guid transferId, ProcessStockTransferRequestDto? request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
         var transfer = await _db.StockTransfers
@@ -429,6 +491,8 @@ public class InventoryService : IInventoryService
 
         if (transfer.Status != StockTransferStatus.Draft)
             throw new AppException("Only draft transfers can be dispatched");
+
+        ValidateTransferProcessRequest(transfer, request);
 
         var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
         var products = await _db.Products
@@ -521,7 +585,7 @@ public class InventoryService : IInventoryService
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task ReceiveTransferAsync(Guid transferId, CancellationToken ct = default)
+    public async Task ReceiveTransferAsync(Guid transferId, ProcessStockTransferRequestDto? request, CancellationToken ct = default)
     {
         var tenantId = _tenantContext.TenantId;
         var transfer = await _db.StockTransfers
@@ -531,6 +595,8 @@ public class InventoryService : IInventoryService
 
         if (transfer.Status != StockTransferStatus.Dispatched)
             throw new AppException("Only dispatched transfers can be received");
+
+        ValidateTransferProcessRequest(transfer, request);
 
         var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
         var products = await _db.Products
@@ -735,6 +801,49 @@ public class InventoryService : IInventoryService
         => string.IsNullOrWhiteSpace(barcodesJson)
             ? null
             : JsonSerializer.Deserialize<List<string>>(barcodesJson);
+
+
+    private static void ValidateTransferProcessRequest(StockTransfer transfer, ProcessStockTransferRequestDto? request)
+    {
+        if (request?.Items is not { Count: > 0 })
+            return;
+
+        var requestedItems = request.Items
+            .Select(x => new
+            {
+                x.ProductId,
+                x.Quantity,
+                Barcodes = NormalizeBarcodes(x.Barcodes, x.Quantity, x.ProductId.ToString())
+            })
+            .OrderBy(x => x.ProductId)
+            .ThenBy(x => x.Quantity)
+            .ToList();
+
+        var transferItems = transfer.Items
+            .Select(x => new
+            {
+                x.ProductId,
+                x.Quantity,
+                Barcodes = NormalizeBarcodes(DeserializeBarcodes(x.SelectedUnitBarcodesJson), x.Quantity, x.ProductId.ToString())
+            })
+            .OrderBy(x => x.ProductId)
+            .ThenBy(x => x.Quantity)
+            .ToList();
+
+        if (requestedItems.Count != transferItems.Count)
+            throw new AppException("Dispatch/receive request items must match transfer items exactly", 400);
+
+        for (var i = 0; i < transferItems.Count; i++)
+        {
+            if (requestedItems[i].ProductId != transferItems[i].ProductId || requestedItems[i].Quantity != transferItems[i].Quantity)
+                throw new AppException("Dispatch/receive request items must match transfer items exactly", 400);
+
+            var requestedBarcodes = requestedItems[i].Barcodes;
+            var transferBarcodes = transferItems[i].Barcodes;
+            if (requestedBarcodes.Count != transferBarcodes.Count || requestedBarcodes.Except(transferBarcodes).Any())
+                throw new AppException("Dispatch/receive request barcodes must match transfer items exactly", 400);
+        }
+    }
 
     private static void ValidateSerializedUnits(List<SerializedStockInUnitRequestDto> serializedUnits, int expectedQuantity, bool requireExactQuantityMatch)
     {

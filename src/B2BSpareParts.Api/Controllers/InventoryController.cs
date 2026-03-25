@@ -40,17 +40,21 @@ public class InventoryController : ControllerBase
     public async Task<ActionResult<ApiResponse<Guid>>> CreateTransfer([FromBody] B2BSpareParts.Application.DTOs.Inventory.CreateStockTransferRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<Guid>.Ok(await _inventoryService.CreateTransferAsync(request, ct)));
 
+    [HttpGet("transfers")]
+    public async Task<ActionResult<ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Inventory.StockTransferListItemResponseDto>>>> GetTransfers([FromQuery] PageRequest request, CancellationToken ct)
+        => Ok(ApiResponse<B2BSpareParts.Application.Common.PageResponse<B2BSpareParts.Application.DTOs.Inventory.StockTransferListItemResponseDto>>.Ok(await _inventoryService.GetTransfersAsync(request, ct)));
+
     [HttpPost("transfers/{id:guid}/dispatch")]
-    public async Task<ActionResult<ApiResponse<string>>> Dispatch(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Dispatch(Guid id, [FromBody] B2BSpareParts.Application.DTOs.Inventory.ProcessStockTransferRequestDto? request, CancellationToken ct)
     {
-        await _inventoryService.DispatchTransferAsync(id, ct);
+        await _inventoryService.DispatchTransferAsync(id, request, ct);
         return Ok(ApiResponse<string>.Ok("Transfer dispatched"));
     }
 
     [HttpPost("transfers/{id:guid}/receive")]
-    public async Task<ActionResult<ApiResponse<string>>> Receive(Guid id, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<string>>> Receive(Guid id, [FromBody] B2BSpareParts.Application.DTOs.Inventory.ProcessStockTransferRequestDto? request, CancellationToken ct)
     {
-        await _inventoryService.ReceiveTransferAsync(id, ct);
+        await _inventoryService.ReceiveTransferAsync(id, request, ct);
         return Ok(ApiResponse<string>.Ok("Transfer received"));
     }
 }
