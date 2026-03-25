@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace B2BSpareParts.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260323151103_addedserilizedjson")]
+    [Migration("20260323224908_addedserilizedjson")]
     partial class addedserilizedjson
     {
         /// <inheritdoc />
@@ -1135,6 +1135,9 @@ namespace B2BSpareParts.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
+
+                    b.Property<string>("SelectedUnitBarcodesJson")
+                        .HasColumnType("text");
 
                     b.Property<Guid>("StockTransferId")
                         .HasColumnType("uuid");
