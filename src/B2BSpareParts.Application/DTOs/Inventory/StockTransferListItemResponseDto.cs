@@ -12,7 +12,7 @@ public class StockTransferListItemResponseDto
     public StockTransferStatus Status { get; set; }
     public string? Notes { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
     public List<StockTransferItemResponseDto> Items { get; set; } = [];
 }
 

@@ -229,7 +229,7 @@ public class InventoryService : IInventoryService
                     ProductId = i.ProductId,
                     ProductName = i.Product!.Name,
                     Quantity = i.Quantity,
-                    Barcodes = DeserializeBarcodes(i.SelectedUnitBarcodesJson) ?? []
+                    Barcodes = DeserializeBarcodes(i.SelectedUnitBarcodesJson) ?? new List<string>()
                 }).ToList()
             })
             .ToListAsync(ct);
