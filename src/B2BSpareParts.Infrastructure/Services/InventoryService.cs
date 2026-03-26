@@ -492,12 +492,12 @@ public class InventoryService : IInventoryService
         if (transfer.Status != StockTransferStatus.Draft)
             throw new AppException("Only draft transfers can be dispatched");
 
-        ValidateTransferProcessRequest(transfer, request);
-
         var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
         var products = await _db.Products
             .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
             .ToDictionaryAsync(x => x.Id, ct);
+        
+        ValidateTransferProcessRequest(transfer, request, products);
 
         foreach (var item in transfer.Items)
         {
@@ -596,12 +596,12 @@ public class InventoryService : IInventoryService
         if (transfer.Status != StockTransferStatus.Dispatched)
             throw new AppException("Only dispatched transfers can be received");
 
-        ValidateTransferProcessRequest(transfer, request);
-
         var productIds = transfer.Items.Select(x => x.ProductId).Distinct().ToList();
         var products = await _db.Products
             .Where(x => x.TenantId == tenantId && productIds.Contains(x.Id) && !x.IsDeleted)
             .ToDictionaryAsync(x => x.Id, ct);
+        
+        ValidateTransferProcessRequest(transfer, request, products);
 
         foreach (var item in transfer.Items)
         {
@@ -803,7 +803,10 @@ public class InventoryService : IInventoryService
             : JsonSerializer.Deserialize<List<string>>(barcodesJson);
 
 
-    private static void ValidateTransferProcessRequest(StockTransfer transfer, ProcessStockTransferRequestDto? request)
+    private static void ValidateTransferProcessRequest(
+        StockTransfer transfer,
+        ProcessStockTransferRequestDto? request,
+        IReadOnlyDictionary<Guid, Product> products)
     {
         if (request?.Items is not { Count: > 0 })
             return;
@@ -813,7 +816,9 @@ public class InventoryService : IInventoryService
             {
                 x.ProductId,
                 x.Quantity,
-                Barcodes = NormalizeBarcodes(x.Barcodes, x.Quantity, x.ProductId.ToString())
+                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serialized
+                    ? NormalizeBarcodes(x.Barcodes, x.Quantity, x.ProductId.ToString())
+                    : []
             })
             .OrderBy(x => x.ProductId)
             .ThenBy(x => x.Quantity)
@@ -824,7 +829,9 @@ public class InventoryService : IInventoryService
             {
                 x.ProductId,
                 x.Quantity,
-                Barcodes = NormalizeBarcodes(DeserializeBarcodes(x.SelectedUnitBarcodesJson), x.Quantity, x.ProductId.ToString())
+                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serialized
+                    ? NormalizeBarcodes(DeserializeBarcodes(x.SelectedUnitBarcodesJson), x.Quantity, x.ProductId.ToString())
+                    : []
             })
             .OrderBy(x => x.ProductId)
             .ThenBy(x => x.Quantity)
