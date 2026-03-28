@@ -8,5 +8,6 @@ public interface IPublicCatalogService
     Task<PublicCatalogFiltersResponseDto> GetFiltersAsync(CancellationToken ct = default);
     Task<PublicCatalogLookupsResponseDto> GetLookupsAsync(CancellationToken ct = default);
     Task<PageResponse<PublicProductListItemDto>> GetProductsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default);
-    Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(PageRequest request, CancellationToken ct = default);
+    Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default);
+    Task<PageResponse<PublicNewArrivalProductItemDto>> GetFeaturedProductsAsync(GetFeaturedProductsRequestDto request, CancellationToken ct = default);
 }
