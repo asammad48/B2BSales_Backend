@@ -16,8 +16,10 @@ public class PublicShopService : IPublicShopService
         _tenantContext = tenantContext;
     }
 
-    public async Task<IEnumerable<PublicShopLookupItemDto>> GetShopsByTenantIdAsync(Guid tenantId, CancellationToken ct = default)
+    public async Task<IEnumerable<PublicShopLookupItemDto>> GetShopsAsync(CancellationToken ct = default)
     {
+        var tenantId = _tenantContext.TenantId;
+
         return await _db.Shops
             .AsNoTracking()
             .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted)

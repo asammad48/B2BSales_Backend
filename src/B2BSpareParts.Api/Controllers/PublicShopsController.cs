@@ -18,7 +18,7 @@ public class PublicShopsController : ControllerBase
         _publicShopService = publicShopService;
     }
 
-    [HttpGet("tenants/{tenantId:guid}/shops")]
-    public async Task<ActionResult<ApiResponse<IEnumerable<PublicShopLookupItemDto>>>> GetShopsByTenantId(Guid tenantId, CancellationToken ct)
-        => Ok(ApiResponse<IEnumerable<PublicShopLookupItemDto>>.Ok(await _publicShopService.GetShopsByTenantIdAsync(tenantId, ct)));
+    [HttpGet("shops")]
+    public async Task<ActionResult<ApiResponse<IEnumerable<PublicShopLookupItemDto>>>> GetShops(CancellationToken ct)
+        => Ok(ApiResponse<IEnumerable<PublicShopLookupItemDto>>.Ok(await _publicShopService.GetShopsAsync(ct)));
 }
