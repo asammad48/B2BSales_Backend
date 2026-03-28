@@ -311,9 +311,8 @@ public class PublicCatalogService : IPublicCatalogService
         if (!request.ShopId.HasValue || request.ShopId.Value == Guid.Empty)
             throw new AppException("ShopId is required", 400);
 
-        var query = BuildPublicCatalogQuery(request.ShopId)
-            .Where(x => x.IsFeatured)
-            .OrderByDescending(x => x.CreatedAt);
+        IQueryable<Product> query = BuildPublicCatalogQuery(request.ShopId)
+            .Where(x => x.IsFeatured);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -328,7 +327,7 @@ public class PublicCatalogService : IPublicCatalogService
             );
         }
 
-        return await BuildPublicNewArrivalPageAsync(query, request, request.ShopId, ct);
+        return await BuildPublicNewArrivalPageAsync(query.OrderByDescending(x => x.CreatedAt), request, request.ShopId, ct);
     }
 
     private IQueryable<Product> BuildPublicCatalogQuery(Guid? shopId)
