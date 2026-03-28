@@ -4,6 +4,7 @@ using B2BSpareParts.Application.DTOs.Clients;
 using B2BSpareParts.Common;
 using B2BSpareParts.Domain.Entities;
 using B2BSpareParts.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace B2BSpareParts.Infrastructure.Services;
@@ -30,6 +31,10 @@ public class ClientService : IClientService
         if (exists)
             throw new AppException("Client with this email already exists", 400);
 
+        var userExists = await _db.Users.AnyAsync(x => x.Email.ToLower() == request.Email.ToLower() && !x.IsDeleted, ct);
+        if (userExists)
+            throw new AppException("User with this email already exists", 400);
+
         var client = new Client
         {
             TenantId = tenantId,
@@ -43,7 +48,22 @@ public class ClientService : IClientService
             Status = request.Status
         };
 
+        var user = new AppUser
+        {
+            TenantId = tenantId,
+            FullName = request.Name,
+            Email = request.Email,
+            Phone = request.Phone,
+            Role = UserRoles.Client,
+            PreferredLanguageId = request.PreferredLanguageId,
+            IsActive = request.IsActive
+        };
+
+        var hasher = new PasswordHasher<AppUser>();
+        user.PasswordHash = hasher.HashPassword(user, request.Password);
+
         _db.Clients.Add(client);
+        _db.Users.Add(user);
         await _db.SaveChangesAsync(ct);
 
         return new ClientResponseDto
