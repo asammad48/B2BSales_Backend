@@ -9,4 +9,5 @@ public class GetPublicProductsRequestDto : PageRequest
     public Guid? BrandId { get; set; }
     public Guid? ModelId { get; set; }
     public Guid? PartTypeId { get; set; }
+    public Guid? ShopId { get; set; }
 }
