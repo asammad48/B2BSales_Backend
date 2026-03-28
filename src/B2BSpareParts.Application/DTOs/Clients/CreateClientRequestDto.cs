@@ -18,6 +18,10 @@ public class CreateClientRequestDto
     [EmailAddress]
     public string Email { get; set; } = default!;
 
+    [Required]
+    [MinLength(6)]
+    public string Password { get; set; } = default!;
+
     public string? Address { get; set; }
 
     public Guid? PreferredCurrencyId { get; set; }
@@ -25,6 +29,8 @@ public class CreateClientRequestDto
     public Guid? PreferredLanguageId { get; set; }
 
     public Guid? PriceTierId { get; set; }
+
+    public bool IsActive { get; set; } = true;
 
     public ClientStatus Status { get; set; } = ClientStatus.PendingApproval;
 }
