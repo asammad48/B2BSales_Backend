@@ -274,9 +274,65 @@ public class PublicCatalogService : IPublicCatalogService
         return await projected.ToPageAsync(request, ct);
     }
 
-    public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(PageRequest request, CancellationToken ct = default)
+    public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
-        var isGuestView = _tenantContext.UserId == null;
+        var query = BuildPublicCatalogQuery(request.ShopId);
+
+        if (request.CategoryId.HasValue)
+            query = query.Where(x => x.CategoryId == request.CategoryId.Value);
+
+        if (request.BrandId.HasValue)
+            query = query.Where(x => x.BrandId == request.BrandId.Value);
+
+        if (request.ModelId.HasValue)
+            query = query.Where(x => x.ModelId == request.ModelId.Value);
+
+        if (request.PartTypeId.HasValue)
+            query = query.Where(x => x.PartTypeId == request.PartTypeId.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLower();
+            query = query.Where(x =>
+                x.Name.ToLower().Contains(search) ||
+                x.Sku.ToLower().Contains(search) ||
+                (x.Barcode != null && x.Barcode.ToLower().Contains(search)) ||
+                (x.Brand != null && x.Brand.Name.ToLower().Contains(search)) ||
+                (x.Model != null && x.Model.Name.ToLower().Contains(search)) ||
+                (x.PartType != null && x.PartType.Name.ToLower().Contains(search))
+            );
+        }
+
+        return await BuildPublicNewArrivalPageAsync(query.OrderByDescending(x => x.CreatedAt), request, request.ShopId, ct);
+    }
+
+    public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetFeaturedProductsAsync(GetFeaturedProductsRequestDto request, CancellationToken ct = default)
+    {
+        if (!request.ShopId.HasValue || request.ShopId.Value == Guid.Empty)
+            throw new AppException("ShopId is required", 400);
+
+        var query = BuildPublicCatalogQuery(request.ShopId)
+            .Where(x => x.IsFeatured)
+            .OrderByDescending(x => x.CreatedAt);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim().ToLower();
+            query = query.Where(x =>
+                x.Name.ToLower().Contains(search) ||
+                x.Sku.ToLower().Contains(search) ||
+                (x.Barcode != null && x.Barcode.ToLower().Contains(search)) ||
+                (x.Brand != null && x.Brand.Name.ToLower().Contains(search)) ||
+                (x.Model != null && x.Model.Name.ToLower().Contains(search)) ||
+                (x.PartType != null && x.PartType.Name.ToLower().Contains(search))
+            );
+        }
+
+        return await BuildPublicNewArrivalPageAsync(query, request, request.ShopId, ct);
+    }
+
+    private IQueryable<Product> BuildPublicCatalogQuery(Guid? shopId)
+    {
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
             .AsNoTracking()
@@ -287,8 +343,35 @@ public class PublicCatalogService : IPublicCatalogService
             .Include(x => x.Images)
             .Include(x => x.Tenant)
             .ThenInclude(t => t!.BaseCurrency)
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible)
-            .OrderByDescending(x => x.CreatedAt);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+
+        if (shopId.HasValue)
+        {
+            query = query.Where(x =>
+                (x.TrackingType == TrackingType.Serialized &&
+                    _db.SerializedInventoryUnits.Any(u =>
+                        u.TenantId == tenantId &&
+                        u.ShopId == shopId.Value &&
+                        u.ProductId == x.Id &&
+                        u.Status == SerializedUnitStatus.InStock &&
+                        !u.IsDeleted)) ||
+                (x.TrackingType != TrackingType.Serialized &&
+                    _db.ShopInventories.Any(i =>
+                        i.TenantId == tenantId &&
+                        i.ShopId == shopId.Value &&
+                        i.ProductId == x.Id &&
+                        i.QuantityOnHand > 0 &&
+                        !i.IsDeleted))
+            );
+        }
+
+        return query;
+    }
+
+    private async Task<PageResponse<PublicNewArrivalProductItemDto>> BuildPublicNewArrivalPageAsync(IQueryable<Product> query, PageRequest request, Guid? shopId, CancellationToken ct)
+    {
+        var isGuestView = _tenantContext.UserId == null;
+        var tenantId = _tenantContext.TenantId;
 
         var projected = query
             .Select<Product, PublicNewArrivalProductItemDto>(x => new PublicNewArrivalProductItemDto
@@ -314,11 +397,13 @@ public class PublicCatalogService : IPublicCatalogService
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
+                        (!shopId.HasValue || u.ShopId == shopId.Value) &&
                         !u.IsDeleted)
                     : _db.ShopInventories
                         .Where(i =>
                             i.TenantId == tenantId &&
                             i.ProductId == x.Id &&
+                            (!shopId.HasValue || i.ShopId == shopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
                 QuantityInHand = x.TrackingType == TrackingType.Serialized
@@ -326,11 +411,13 @@ public class PublicCatalogService : IPublicCatalogService
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
+                        (!shopId.HasValue || u.ShopId == shopId.Value) &&
                         !u.IsDeleted)
                     : _db.ShopInventories
                         .Where(i =>
                             i.TenantId == tenantId &&
                             i.ProductId == x.Id &&
+                            (!shopId.HasValue || i.ShopId == shopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
                 IsInStock = x.TrackingType == TrackingType.Serialized
@@ -338,18 +425,21 @@ public class PublicCatalogService : IPublicCatalogService
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
+                        (!shopId.HasValue || u.ShopId == shopId.Value) &&
                         !u.IsDeleted)
                     : _db.ShopInventories.Any(i =>
                         i.TenantId == tenantId &&
                         i.ProductId == x.Id &&
                         i.QuantityOnHand > 0 &&
+                        (!shopId.HasValue || i.ShopId == shopId.Value) &&
                         !i.IsDeleted),
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView,
-                Slug = null, // Field not yet implemented in Product entity
+                Slug = null,
                 CreatedAt = x.CreatedAt
             });
 
         return await projected.ToPageAsync(request, ct);
     }
+
 }
