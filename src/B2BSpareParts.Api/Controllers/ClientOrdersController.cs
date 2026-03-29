@@ -18,7 +18,7 @@ public class ClientOrdersController : ControllerBase
         _orderService = orderService;
     }
 
-    [HttpGet("clients/{clientId:guid}/orders")]
+    [HttpGet("clients/{clientId:guid}/client-orders")]
     public async Task<ActionResult<ApiResponse<PageResponse<ClientOrderListItemDto>>>> GetClientOrders(Guid clientId, [FromQuery] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<ClientOrderListItemDto>>.Ok(await _orderService.GetClientOrdersAsync(clientId, request, ct)));
 
