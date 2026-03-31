@@ -11,6 +11,7 @@ namespace B2BSpareParts.Api.Controllers;
 [Authorize]
 public class BulkProductUploadController : ControllerBase
 {
+    private const long MaxBulkUploadSizeBytes = 100L * 1024L * 1024L;
     private readonly IBulkProductUploadService _bulkUploadService;
 
     public BulkProductUploadController(IBulkProductUploadService bulkUploadService)
@@ -20,6 +21,8 @@ public class BulkProductUploadController : ControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxBulkUploadSizeBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxBulkUploadSizeBytes)]
     public async Task<ActionResult<ApiResponse<Guid>>> Upload(IFormFile file, CancellationToken ct)
     {
         var jobId = await _bulkUploadService.CreateJobAsync(file, ct);

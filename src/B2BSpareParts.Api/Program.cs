@@ -8,6 +8,7 @@ using B2BSpareParts.Infrastructure;
 using B2BSpareParts.Infrastructure.Persistence;
 using B2BSpareParts.Infrastructure.Seeding;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -17,6 +18,20 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
     ContentRootPath = Directory.GetCurrentDirectory()
+});
+
+const long bytesPerMb = 1024L * 1024L;
+var maxBulkUploadSizeMb = builder.Configuration.GetValue<long?>("BulkUpload:MaxFileSizeMb") ?? 100L;
+var maxBulkUploadSizeBytes = maxBulkUploadSizeMb * bytesPerMb;
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = maxBulkUploadSizeBytes;
+});
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = maxBulkUploadSizeBytes;
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
