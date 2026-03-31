@@ -1,3 +1,12 @@
 namespace B2BSpareParts.Domain.Enums;
 
-public enum QualityType { Original = 1, OEM = 2, HighCopy = 3, Refurbished = 4 }
+public enum QualityType
+{
+    Compatible = 1,
+    Deji = 2,
+    Desconocido = 3,
+    Oem = 4,
+    Original = 5,
+    OriginalDesmontaje = 6,
+    ServicePack = 7
+}

@@ -68,7 +68,7 @@ public class PosService : IPosService
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 SellingPrice = x.DefaultSellingPrice,
                 CurrencyCode = x.Tenant!.DefaultSellingCurrency!.Code,
-                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -83,7 +83,7 @@ public class PosService : IPosService
                             (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value))
                         .Sum(i => i.QuantityOnHand),
                 LowStockThreshold = x.LowStockThreshold,
-                IsLowStock = (x.TrackingType == TrackingType.Serialized
+                IsLowStock = (x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -216,7 +216,7 @@ public class PosService : IPosService
                 {
                     ProductId = g.Key,
                     Quantity = quantity,
-                    Barcodes = product.TrackingType == TrackingType.Serialized
+                    Barcodes = product.TrackingType == TrackingType.Serializado
                         ? NormalizeBarcodes(g.SelectMany(i => i.Barcodes ?? []), quantity, product.Name)
                         : []
                 };
@@ -242,7 +242,7 @@ public class PosService : IPosService
         foreach (var item in aggregatedItems)
         {
             var product = products.First(x => x.Id == item.ProductId);
-            var selectedBarcodes = product.TrackingType == TrackingType.Serialized ? item.Barcodes : null;
+            var selectedBarcodes = product.TrackingType == TrackingType.Serializado ? item.Barcodes : null;
             await EnsureStockAvailabilityAsync(tenantId, shop.Id, product, item.Quantity, ct, selectedBarcodes);
 
             order.Items.Add(new OrderItem
@@ -378,7 +378,7 @@ public class PosService : IPosService
 
     private async Task EnsureStockAvailabilityAsync(Guid tenantId, Guid shopId, Product product, int quantity, CancellationToken ct, List<string>? selectedBarcodes = null)
     {
-        if (product.TrackingType == TrackingType.Serialized)
+        if (product.TrackingType == TrackingType.Serializado)
         {
             if (selectedBarcodes is not { Count: > 0 })
                 throw new AppException($"Barcodes are required for serialized product {product.Name}", 400);
@@ -410,7 +410,7 @@ public class PosService : IPosService
 
     private async Task DeductStockAsync(Order order, OrderItem item, Product product, CancellationToken ct)
     {
-        if (product.TrackingType == TrackingType.Serialized)
+        if (product.TrackingType == TrackingType.Serializado)
         {
             var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
             if (selectedBarcodes is not { Count: > 0 })

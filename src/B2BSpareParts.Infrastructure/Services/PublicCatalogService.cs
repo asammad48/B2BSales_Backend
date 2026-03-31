@@ -28,10 +28,11 @@ public class PublicCatalogService : IPublicCatalogService
             .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
 
         var categories = await baseQuery
-            .GroupBy(x => new { x.CategoryId, x.Category!.Name, x.Category.Code })
+            .Where(x => x.CategoryId != null && x.Category != null)
+            .GroupBy(x => new { Id = x.CategoryId!.Value, x.Category!.Name, x.Category.Code })
             .Select(g => new PublicLookupItemDto
             {
-                Id = g.Key.CategoryId,
+                Id = g.Key.Id,
                 Name = g.Key.Name,
                 Code = g.Key.Code,
                 ProductCount = g.Count()
@@ -175,14 +176,14 @@ public class PublicCatalogService : IPublicCatalogService
         if (request.ShopId.HasValue)
         {
             query = query.Where(x =>
-                (x.TrackingType == TrackingType.Serialized &&
+                (x.TrackingType == TrackingType.Serializado &&
                     _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
                         u.ShopId == request.ShopId.Value &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
                         !u.IsDeleted)) ||
-                (x.TrackingType != TrackingType.Serialized &&
+                (x.TrackingType != TrackingType.Serializado &&
                     _db.ShopInventories.Any(i =>
                         i.TenantId == tenantId &&
                         i.ShopId == request.ShopId.Value &&
@@ -215,7 +216,7 @@ public class PublicCatalogService : IPublicCatalogService
                 Sku = x.Sku,
                 Barcode = x.Barcode,
                 CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Category != null ? x.Category.Name : string.Empty,
                 BrandId = x.BrandId,
                 BrandName = x.Brand != null ? x.Brand.Name : null,
                 ModelId = x.ModelId,
@@ -225,7 +226,7 @@ public class PublicCatalogService : IPublicCatalogService
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 Price = x.DefaultSellingPrice,
                 CurrencyCode = x.Tenant!.BaseCurrency!.Code,
-                StockQuantity = x.TrackingType == TrackingType.Serialized
+                StockQuantity = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -239,7 +240,7 @@ public class PublicCatalogService : IPublicCatalogService
                             (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
-                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -253,7 +254,7 @@ public class PublicCatalogService : IPublicCatalogService
                             (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
-                IsInStock = x.TrackingType == TrackingType.Serialized
+                IsInStock = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -347,14 +348,14 @@ public class PublicCatalogService : IPublicCatalogService
         if (shopId.HasValue)
         {
             query = query.Where(x =>
-                (x.TrackingType == TrackingType.Serialized &&
+                (x.TrackingType == TrackingType.Serializado &&
                     _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
                         u.ShopId == shopId.Value &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
                         !u.IsDeleted)) ||
-                (x.TrackingType != TrackingType.Serialized &&
+                (x.TrackingType != TrackingType.Serializado &&
                     _db.ShopInventories.Any(i =>
                         i.TenantId == tenantId &&
                         i.ShopId == shopId.Value &&
@@ -381,7 +382,7 @@ public class PublicCatalogService : IPublicCatalogService
                 Sku = x.Sku,
                 Barcode = x.Barcode,
                 CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Category != null ? x.Category.Name : string.Empty,
                 BrandId = x.BrandId,
                 BrandName = x.Brand != null ? x.Brand.Name : null,
                 ModelId = x.ModelId,
@@ -391,7 +392,7 @@ public class PublicCatalogService : IPublicCatalogService
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 Price = x.DefaultSellingPrice,
                 CurrencyCode = x.Tenant!.BaseCurrency!.Code,
-                StockQuantity = x.TrackingType == TrackingType.Serialized
+                StockQuantity = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -405,7 +406,7 @@ public class PublicCatalogService : IPublicCatalogService
                             (!shopId.HasValue || i.ShopId == shopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
-                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
@@ -419,7 +420,7 @@ public class PublicCatalogService : IPublicCatalogService
                             (!shopId.HasValue || i.ShopId == shopId.Value) &&
                             !i.IsDeleted)
                         .Sum(i => i.QuantityOnHand),
-                IsInStock = x.TrackingType == TrackingType.Serialized
+                IsInStock = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&

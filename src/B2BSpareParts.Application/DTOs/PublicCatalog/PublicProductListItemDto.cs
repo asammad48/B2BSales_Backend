@@ -9,7 +9,7 @@ public class PublicProductListItemDto
     public string? ShortDescription { get; set; }
     public string Sku { get; set; } = default!;
     public string? Barcode { get; set; }
-    public Guid CategoryId { get; set; }
+    public Guid? CategoryId { get; set; }
     public string CategoryName { get; set; } = default!;
     public Guid? BrandId { get; set; }
     public string? BrandName { get; set; }

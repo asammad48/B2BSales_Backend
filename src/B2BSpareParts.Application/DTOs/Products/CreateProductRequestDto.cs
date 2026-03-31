@@ -4,7 +4,7 @@ namespace B2BSpareParts.Application.DTOs.Products;
 
 public class CreateProductRequestDto
 {
-    public Guid CategoryId { get; set; }
+    public Guid? CategoryId { get; set; }
     public Guid? BrandId { get; set; }
     public Guid? ModelId { get; set; }
     public Guid? PartTypeId { get; set; }

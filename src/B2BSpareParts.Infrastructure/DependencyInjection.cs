@@ -2,6 +2,7 @@ using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Infrastructure.Auth;
 using B2BSpareParts.Infrastructure.Persistence;
 using B2BSpareParts.Infrastructure.Seeding;
+using B2BSpareParts.Infrastructure.Services.BulkUpload;
 using B2BSpareParts.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +39,10 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IDateRangeService, DateRangeService>();
+        services.AddScoped<IBulkProductUploadService, BulkProductUploadService>();
+        services.AddScoped<BulkProductUploadProcessor>();
+        services.AddSingleton<IBulkUploadBackgroundQueue, BulkUploadBackgroundQueue>();
+        services.AddHostedService<BulkProductUploadBackgroundService>();
 
         return services;
     }

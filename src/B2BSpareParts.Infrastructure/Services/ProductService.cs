@@ -47,7 +47,7 @@ public class ProductService : IProductService
                 Barcode = x.Barcode,
                 Name = x.Name,
                 CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Category != null ? x.Category.Name : string.Empty,
                 BrandId = x.BrandId,
                 BrandName = x.Brand != null ? x.Brand.Name : null,
                 ModelId = x.ModelId,
@@ -58,7 +58,7 @@ public class ProductService : IProductService
                 QualityType = x.QualityType,
                 DefaultSellingPrice = x.DefaultSellingPrice,
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
-                QuantityInHand = x.TrackingType == TrackingType.Serialized
+                QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
                     : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
                 IsActive = x.IsActive,
@@ -104,7 +104,7 @@ public class ProductService : IProductService
             Barcode = product.Barcode,
             Name = product.Name,
             CategoryId = product.CategoryId,
-            CategoryName = product.Category!.Name,
+            CategoryName = product.Category?.Name ?? string.Empty,
             BrandId = product.BrandId,
             BrandName = product.Brand?.Name,
             ModelId = product.ModelId,
