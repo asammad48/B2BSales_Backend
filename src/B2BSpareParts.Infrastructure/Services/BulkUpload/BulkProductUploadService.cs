@@ -11,6 +11,7 @@ namespace B2BSpareParts.Infrastructure.Services.BulkUpload;
 
 public class BulkProductUploadService : IBulkProductUploadService
 {
+    private const long BytesPerMb = 1024L * 1024L;
     private readonly AppDbContext _db;
     private readonly ITenantContext _tenantContext;
     private readonly IAppEnvironment _appEnvironment;
@@ -36,8 +37,10 @@ public class BulkProductUploadService : IBulkProductUploadService
         if (file == null || file.Length == 0)
             throw new AppException("CSV file is required.", 400);
 
-        if (file.Length > 30 * 1024 * 1024)
-            throw new AppException("File size exceeds 30MB limit.", 400);
+        var maxFileSizeMb = _configuration.GetValue<long?>("BulkUpload:MaxFileSizeMb") ?? 100L;
+        var maxFileSizeBytes = maxFileSizeMb * BytesPerMb;
+        if (file.Length > maxFileSizeBytes)
+            throw new AppException($"File size exceeds {maxFileSizeMb}MB limit.", 400);
 
         var tenantId = _tenantContext.TenantId;
         if (tenantId == Guid.Empty)

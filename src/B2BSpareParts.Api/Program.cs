@@ -33,6 +33,10 @@ builder.Services.Configure<FormOptions>(options =>
 {
     options.MultipartBodyLengthLimit = maxBulkUploadSizeBytes;
 });
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.MaxRequestBodySize = maxBulkUploadSizeBytes;
+});
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAppEnvironment, WebHostAppEnvironment>();
