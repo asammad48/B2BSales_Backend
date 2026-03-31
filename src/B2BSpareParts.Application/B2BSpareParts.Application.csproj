@@ -1,9 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="2.2.0" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\B2BSpareParts.Domain\B2BSpareParts.Domain.csproj" />
     <ProjectReference Include="..\B2BSpareParts.Common\B2BSpareParts.Common.csproj" />
