@@ -28,7 +28,7 @@ public class InventoryService : IInventoryService
 
         var quantityItems = (await _db.ShopInventories
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Product!.TrackingType == TrackingType.QuantityBased)
+            .Where(x => x.TenantId == tenantId && !x.IsDeleted && x.Product!.TrackingType == TrackingType.PorCantidad)
             .Where(x => search == null ||
                         x.Product!.Name.ToLower().Contains(search) ||
                         x.Product.Sku.ToLower().Contains(search) ||
@@ -151,7 +151,7 @@ public class InventoryService : IInventoryService
                         Imei1 = x.Imei1 ?? string.Empty,
                         Imei2 = x.Imei2 ?? string.Empty
                     }).ToList(),
-                    TrackingType = TrackingType.Serialized.ToString(),
+                    TrackingType = TrackingType.Serializado.ToString(),
                     QuantityOnHand = g.Count(),
                     ReservedQuantity = reservedQuantity,
                     AvailableQuantity = availableQuantity,
@@ -260,7 +260,7 @@ public class InventoryService : IInventoryService
                                     ? request.BuyingPrice + (request.BuyingPrice * (request.MarkupPercentage ?? 0) / 100m)
                                     : product.DefaultSellingPrice);
 
-        if (product.TrackingType == TrackingType.Serialized)
+        if (product.TrackingType == TrackingType.Serializado)
         {
             ValidateSerializedUnits(request.SerializedUnits, request.Quantity, requireExactQuantityMatch: true);
 
@@ -344,7 +344,7 @@ public class InventoryService : IInventoryService
             .FirstOrDefaultAsync(x => x.Id == request.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct)
             ?? throw new AppException("Product not found", 404);
 
-        if (product.TrackingType == TrackingType.Serialized)
+        if (product.TrackingType == TrackingType.Serializado)
         {
             await AdjustSerializedStockAsync(request, product, tenantId, ct);
             return;
@@ -397,7 +397,7 @@ public class InventoryService : IInventoryService
             throw new AppException("One or more products were not found", 404);
 
         var quantityRequests = request.Items
-            .Where(x => products[x.ProductId].TrackingType == TrackingType.QuantityBased)
+            .Where(x => products[x.ProductId].TrackingType == TrackingType.PorCantidad)
             .GroupBy(x => x.ProductId)
             .Select(g => new { ProductId = g.Key, Quantity = g.Sum(x => x.Quantity) })
             .ToList();
@@ -419,7 +419,7 @@ public class InventoryService : IInventoryService
         }
 
         var serializedRequests = request.Items
-            .Where(x => products[x.ProductId].TrackingType == TrackingType.Serialized)
+            .Where(x => products[x.ProductId].TrackingType == TrackingType.Serializado)
             .Select(x => new
             {
                 x.ProductId,
@@ -470,7 +470,7 @@ public class InventoryService : IInventoryService
             {
                 ProductId = x.ProductId,
                 Quantity = x.Quantity,
-                SelectedUnitBarcodesJson = products[x.ProductId].TrackingType == TrackingType.Serialized
+                SelectedUnitBarcodesJson = products[x.ProductId].TrackingType == TrackingType.Serializado
                     ? SerializeBarcodes(NormalizeBarcodes(x.Barcodes, x.Quantity, products[x.ProductId].Name))
                     : null
             }).ToList()
@@ -502,7 +502,7 @@ public class InventoryService : IInventoryService
         foreach (var item in transfer.Items)
         {
             var product = products[item.ProductId];
-            if (product.TrackingType == TrackingType.Serialized)
+            if (product.TrackingType == TrackingType.Serializado)
             {
                 var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
                 if (selectedBarcodes is not { Count: > 0 })
@@ -606,7 +606,7 @@ public class InventoryService : IInventoryService
         foreach (var item in transfer.Items)
         {
             var product = products[item.ProductId];
-            if (product.TrackingType == TrackingType.Serialized)
+            if (product.TrackingType == TrackingType.Serializado)
             {
                 var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
                 if (selectedBarcodes is not { Count: > 0 })
@@ -816,7 +816,7 @@ public class InventoryService : IInventoryService
             {
                 x.ProductId,
                 x.Quantity,
-                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serialized
+                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serializado
                     ? NormalizeBarcodes(x.Barcodes, x.Quantity, x.ProductId.ToString())
                     : []
             })
@@ -829,7 +829,7 @@ public class InventoryService : IInventoryService
             {
                 x.ProductId,
                 x.Quantity,
-                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serialized
+                Barcodes = products[x.ProductId].TrackingType == TrackingType.Serializado
                     ? NormalizeBarcodes(DeserializeBarcodes(x.SelectedUnitBarcodesJson), x.Quantity, x.ProductId.ToString())
                     : []
             })

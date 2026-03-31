@@ -285,7 +285,7 @@ public class OrderService : IOrderService
         }
 
         var autoSelectedSerializedBarcodes = await GetAutoSelectedSerializedBarcodesAsync(
-            products.Where(x => x.TrackingType == TrackingType.Serialized).ToList(),
+            products.Where(x => x.TrackingType == TrackingType.Serializado).ToList(),
             request.ShopId,
             requestedItems,
             tenantId,
@@ -397,7 +397,7 @@ public class OrderService : IOrderService
         foreach (var item in order.Items)
         {
             var product = item.Product ?? await _db.Products.FirstAsync(x => x.Id == item.ProductId && x.TenantId == tenantId && !x.IsDeleted, ct);
-            if (product.TrackingType == TrackingType.Serialized)
+            if (product.TrackingType == TrackingType.Serializado)
             {
                 var selectedBarcodes = DeserializeBarcodes(item.SelectedUnitBarcodesJson);
                 var units = await GetSerializedUnitsForCompletionAsync(order.ShopId, item.ProductId, item.Quantity, tenantId, selectedBarcodes, ct);
@@ -514,7 +514,7 @@ public class OrderService : IOrderService
 
     private async Task<List<string>?> GetSelectedSerializedBarcodesForCreateAsync(Product product, Guid shopId, CreateOrderItemRequestDto item, Guid tenantId, CancellationToken ct)
     {
-        if (product.TrackingType != TrackingType.Serialized)
+        if (product.TrackingType != TrackingType.Serializado)
             return null;
 
         if (item.Barcodes == null || item.Barcodes.Count == 0)
@@ -588,7 +588,7 @@ public class OrderService : IOrderService
 
     private async Task EnsureStockAvailableForOrderItemAsync(Product product, Guid shopId, int quantity, Guid tenantId, CancellationToken ct, List<string>? selectedBarcodes = null)
     {
-        if (product.TrackingType == TrackingType.Serialized)
+        if (product.TrackingType == TrackingType.Serializado)
         {
             if (selectedBarcodes is { Count: > 0 })
             {

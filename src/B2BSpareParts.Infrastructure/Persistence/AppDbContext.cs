@@ -1,4 +1,5 @@
 using B2BSpareParts.Domain.Entities;
+using B2BSpareParts.Domain.Entities.BulkUpload;
 using Microsoft.EntityFrameworkCore;
 
 namespace B2BSpareParts.Infrastructure.Persistence;
@@ -33,6 +34,8 @@ public class AppDbContext : DbContext
     public DbSet<ThemeSetting> ThemeSettings => Set<ThemeSetting>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ContactInquiry> ContactInquiries => Set<ContactInquiry>();
+    public DbSet<BulkUploadJob> BulkUploadJobs => Set<BulkUploadJob>();
+    public DbSet<BulkUploadJobItem> BulkUploadJobItems => Set<BulkUploadJobItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +50,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Order>().HasIndex(x => new { x.TenantId, x.OrderNumber }).IsUnique();
         modelBuilder.Entity<Currency>().HasIndex(x => x.Code).IsUnique();
         modelBuilder.Entity<Language>().HasIndex(x => x.Code).IsUnique();
+        modelBuilder.Entity<BulkUploadJobItem>().HasIndex(x => new { x.JobId, x.RowNumber }).IsUnique();
 
         modelBuilder.Entity<ProductRelation>()
             .HasOne(x => x.Product)
@@ -76,5 +80,11 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.DestinationShopId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<BulkUploadJobItem>()
+            .HasOne(x => x.Job)
+            .WithMany()
+            .HasForeignKey(x => x.JobId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
