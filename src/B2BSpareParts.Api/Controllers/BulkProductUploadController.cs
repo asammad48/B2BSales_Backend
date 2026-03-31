@@ -34,7 +34,7 @@ public class BulkProductUploadController : ControllerBase
         return Ok(ApiResponse<Guid>.Ok(jobId, "Bulk upload resume queued."));
     }
 
-    [HttpGet("{jobId:guid}/status")]
+    [HttpGet("{jobId:guid}/job-status")]
     public async Task<ActionResult<ApiResponse<BulkProductUploadStatusResponseDto>>> Status(Guid jobId, CancellationToken ct)
         => Ok(ApiResponse<BulkProductUploadStatusResponseDto>.Ok(await _bulkUploadService.GetStatusAsync(jobId, ct)));
 }
