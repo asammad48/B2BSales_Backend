@@ -3,7 +3,6 @@ using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.BulkUpload;
 using B2BSpareParts.Domain.Entities.BulkUpload;
 using B2BSpareParts.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,20 +13,20 @@ public class BulkProductUploadService : IBulkProductUploadService
 {
     private readonly AppDbContext _db;
     private readonly ITenantContext _tenantContext;
-    private readonly IWebHostEnvironment _env;
+    private readonly IAppEnvironment _appEnvironment;
     private readonly IConfiguration _configuration;
     private readonly IBulkUploadBackgroundQueue _queue;
 
     public BulkProductUploadService(
         AppDbContext db,
         ITenantContext tenantContext,
-        IWebHostEnvironment env,
+        IAppEnvironment appEnvironment,
         IConfiguration configuration,
         IBulkUploadBackgroundQueue queue)
     {
         _db = db;
         _tenantContext = tenantContext;
-        _env = env;
+        _appEnvironment = appEnvironment;
         _configuration = configuration;
         _queue = queue;
     }
@@ -45,7 +44,7 @@ public class BulkProductUploadService : IBulkProductUploadService
             throw new AppException("Tenant context is required.", 400);
 
         var uploadFolder = _configuration["FileStorage:UploadFolder"] ?? "uploads";
-        var bulkFolder = Path.Combine(_env.ContentRootPath, uploadFolder, "bulk");
+        var bulkFolder = Path.Combine(_appEnvironment.ContentRootPath, uploadFolder, "bulk");
         Directory.CreateDirectory(bulkFolder);
 
         var fileName = $"bulk-{Guid.NewGuid()}.csv";

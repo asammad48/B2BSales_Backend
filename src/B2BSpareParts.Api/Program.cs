@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using B2BSpareParts.Api.Services;
 using B2BSpareParts.Application.Common;
+using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Common;
 using B2BSpareParts.Infrastructure;
 using B2BSpareParts.Infrastructure.Persistence;
@@ -18,6 +20,7 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IAppEnvironment, WebHostAppEnvironment>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
