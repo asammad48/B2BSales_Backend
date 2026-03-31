@@ -28,10 +28,11 @@ public class PublicCatalogService : IPublicCatalogService
             .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
 
         var categories = await baseQuery
-            .GroupBy(x => new { x.CategoryId, x.Category!.Name, x.Category.Code })
+            .Where(x => x.CategoryId != null && x.Category != null)
+            .GroupBy(x => new { Id = x.CategoryId!.Value, x.Category!.Name, x.Category.Code })
             .Select(g => new PublicLookupItemDto
             {
-                Id = g.Key.CategoryId,
+                Id = g.Key.Id,
                 Name = g.Key.Name,
                 Code = g.Key.Code,
                 ProductCount = g.Count()
@@ -215,7 +216,7 @@ public class PublicCatalogService : IPublicCatalogService
                 Sku = x.Sku,
                 Barcode = x.Barcode,
                 CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Category != null ? x.Category.Name : string.Empty,
                 BrandId = x.BrandId,
                 BrandName = x.Brand != null ? x.Brand.Name : null,
                 ModelId = x.ModelId,
@@ -381,7 +382,7 @@ public class PublicCatalogService : IPublicCatalogService
                 Sku = x.Sku,
                 Barcode = x.Barcode,
                 CategoryId = x.CategoryId,
-                CategoryName = x.Category!.Name,
+                CategoryName = x.Category != null ? x.Category.Name : string.Empty,
                 BrandId = x.BrandId,
                 BrandName = x.Brand != null ? x.Brand.Name : null,
                 ModelId = x.ModelId,

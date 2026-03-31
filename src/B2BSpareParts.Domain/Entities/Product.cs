@@ -5,7 +5,7 @@ namespace B2BSpareParts.Domain.Entities;
 
 public class Product : TenantEntity
 {
-    public Guid CategoryId { get; set; }
+    public Guid? CategoryId { get; set; }
     public Guid? BrandId { get; set; }
     public Guid? ModelId { get; set; }
     public Guid? PartTypeId { get; set; }

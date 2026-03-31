@@ -68,10 +68,34 @@ public class BulkProductUploadProcessor
                 try
                 {
                     var sku = string.IsNullOrWhiteSpace(row.Sku) ? GenerateSku(row.ProductName, row.RowNumber) : row.Sku.Trim();
-                    var categoryId = categories[Normalize(row.NewCategory)];
-                    var partTypeId = partTypes[Normalize(row.NewPartType)];
-                    var brandId = brands[Normalize(row.NewBrand)];
-                    var modelId = models[(Normalize(row.NewBrand), Normalize(row.NewModel))];
+                    var normalizedCategory = Normalize(row.NewCategory);
+                    var normalizedPartType = Normalize(row.NewPartType);
+                    var normalizedBrand = Normalize(row.NewBrand);
+                    var normalizedModel = Normalize(row.NewModel);
+
+                    Guid? categoryId = null;
+                    if (!string.IsNullOrWhiteSpace(normalizedCategory) && categories.TryGetValue(normalizedCategory, out var mappedCategoryId))
+                    {
+                        categoryId = mappedCategoryId;
+                    }
+
+                    Guid? partTypeId = null;
+                    if (!string.IsNullOrWhiteSpace(normalizedPartType) && partTypes.TryGetValue(normalizedPartType, out var mappedPartTypeId))
+                    {
+                        partTypeId = mappedPartTypeId;
+                    }
+
+                    Guid? brandId = null;
+                    if (!string.IsNullOrWhiteSpace(normalizedBrand) && brands.TryGetValue(normalizedBrand, out var mappedBrandId))
+                    {
+                        brandId = mappedBrandId;
+                    }
+
+                    Guid? modelId = null;
+                    if (brandId.HasValue && !string.IsNullOrWhiteSpace(normalizedModel) && models.TryGetValue((normalizedBrand, normalizedModel), out var mappedModelId))
+                    {
+                        modelId = mappedModelId;
+                    }
 
                     var existingProduct = await _db.Products.FirstOrDefaultAsync(x => x.TenantId == job.TenantId && !x.IsDeleted && x.Sku.ToLower() == sku.ToLower(), ct);
                     if (existingProduct == null)
