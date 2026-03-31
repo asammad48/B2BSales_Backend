@@ -20,7 +20,7 @@ public class BulkProductUploadController : ControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
-    public async Task<ActionResult<ApiResponse<Guid>>> Upload([FromForm] IFormFile file, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<Guid>>> Upload(IFormFile file, CancellationToken ct)
     {
         var jobId = await _bulkUploadService.CreateJobAsync(file, ct);
         await _bulkUploadService.EnqueueJobAsync(jobId, ct);
