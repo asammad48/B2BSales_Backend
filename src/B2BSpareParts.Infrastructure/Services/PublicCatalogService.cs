@@ -160,17 +160,21 @@ public class PublicCatalogService : IPublicCatalogService
             .ThenInclude(t => t!.BaseCurrency)
             .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
 
-        if (request.CategoryId.HasValue)
-            query = query.Where(x => x.CategoryId == request.CategoryId.Value);
+        var categoryIds = request.GetCategoryFilterIds();
+        if (categoryIds.Count > 0)
+            query = query.Where(x => x.CategoryId.HasValue && categoryIds.Contains(x.CategoryId.Value));
 
-        if (request.BrandId.HasValue)
-            query = query.Where(x => x.BrandId == request.BrandId.Value);
+        var brandIds = request.GetBrandFilterIds();
+        if (brandIds.Count > 0)
+            query = query.Where(x => x.BrandId.HasValue && brandIds.Contains(x.BrandId.Value));
 
-        if (request.ModelId.HasValue)
-            query = query.Where(x => x.ModelId == request.ModelId.Value);
+        var modelIds = request.GetModelFilterIds();
+        if (modelIds.Count > 0)
+            query = query.Where(x => x.ModelId.HasValue && modelIds.Contains(x.ModelId.Value));
 
-        if (request.PartTypeId.HasValue)
-            query = query.Where(x => x.PartTypeId == request.PartTypeId.Value);
+        var partTypeIds = request.GetPartTypeFilterIds();
+        if (partTypeIds.Count > 0)
+            query = query.Where(x => x.PartTypeId.HasValue && partTypeIds.Contains(x.PartTypeId.Value));
 
 
         if (request.ShopId.HasValue)
@@ -279,17 +283,21 @@ public class PublicCatalogService : IPublicCatalogService
     {
         var query = BuildPublicCatalogQuery(request.ShopId);
 
-        if (request.CategoryId.HasValue)
-            query = query.Where(x => x.CategoryId == request.CategoryId.Value);
+        var categoryIds = request.GetCategoryFilterIds();
+        if (categoryIds.Count > 0)
+            query = query.Where(x => x.CategoryId.HasValue && categoryIds.Contains(x.CategoryId.Value));
 
-        if (request.BrandId.HasValue)
-            query = query.Where(x => x.BrandId == request.BrandId.Value);
+        var brandIds = request.GetBrandFilterIds();
+        if (brandIds.Count > 0)
+            query = query.Where(x => x.BrandId.HasValue && brandIds.Contains(x.BrandId.Value));
 
-        if (request.ModelId.HasValue)
-            query = query.Where(x => x.ModelId == request.ModelId.Value);
+        var modelIds = request.GetModelFilterIds();
+        if (modelIds.Count > 0)
+            query = query.Where(x => x.ModelId.HasValue && modelIds.Contains(x.ModelId.Value));
 
-        if (request.PartTypeId.HasValue)
-            query = query.Where(x => x.PartTypeId == request.PartTypeId.Value);
+        var partTypeIds = request.GetPartTypeFilterIds();
+        if (partTypeIds.Count > 0)
+            query = query.Where(x => x.PartTypeId.HasValue && partTypeIds.Contains(x.PartTypeId.Value));
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
