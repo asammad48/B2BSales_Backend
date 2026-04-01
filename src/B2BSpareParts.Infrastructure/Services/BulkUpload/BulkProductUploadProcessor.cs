@@ -3,6 +3,7 @@ using B2BSpareParts.Domain.Entities;
 using B2BSpareParts.Domain.Entities.BulkUpload;
 using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Persistence;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualBasic.FileIO;
@@ -13,11 +14,13 @@ public class BulkProductUploadProcessor
 {
     private readonly AppDbContext _db;
     private readonly ILogger<BulkProductUploadProcessor> _logger;
+    private readonly int _chunkSize;
 
-    public BulkProductUploadProcessor(AppDbContext db, ILogger<BulkProductUploadProcessor> logger)
+    public BulkProductUploadProcessor(AppDbContext db, ILogger<BulkProductUploadProcessor> logger, IConfiguration configuration)
     {
         _db = db;
         _logger = logger;
+        _chunkSize = Math.Max(1, configuration.GetValue<int?>("BulkUpload:ProcessingChunkSize") ?? 100);
     }
 
     public async Task ProcessAsync(Guid jobId, CancellationToken ct)
@@ -50,8 +53,6 @@ public class BulkProductUploadProcessor
 
             var pendingRows = rows.Where(x => !existingItems.TryGetValue(x.RowNumber, out var item) || item.Status != BulkUploadRowStatus.Completed).ToList();
 
-            await using var tx = await _db.Database.BeginTransactionAsync(ct);
-
             var categories = await UpsertCategoriesAsync(job.TenantId, pendingRows, ct);
             var partTypes = await UpsertPartTypesAsync(job.TenantId, pendingRows, ct);
             var brands = await UpsertBrandsAsync(job.TenantId, pendingRows, ct);
@@ -62,124 +63,136 @@ public class BulkProductUploadProcessor
             var fail = 0;
             var processed = processedCompleted;
 
-            foreach (var row in pendingRows)
+            foreach (var chunk in ChunkRows(pendingRows, _chunkSize))
             {
-                processed++;
+                await using var tx = await _db.Database.BeginTransactionAsync(ct);
                 try
                 {
-                    var sku = string.IsNullOrWhiteSpace(row.Sku) ? GenerateSku(row.ProductName, row.RowNumber) : row.Sku.Trim();
-                    var normalizedCategory = Normalize(row.NewCategory);
-                    var normalizedPartType = Normalize(row.NewPartType);
-                    var normalizedBrand = Normalize(row.NewBrand);
-                    var normalizedModel = Normalize(row.NewModel);
-
-                    Guid? categoryId = null;
-                    if (!string.IsNullOrWhiteSpace(normalizedCategory) && categories.TryGetValue(normalizedCategory, out var mappedCategoryId))
+                    foreach (var row in chunk)
                     {
-                        categoryId = mappedCategoryId;
-                    }
-
-                    Guid? partTypeId = null;
-                    if (!string.IsNullOrWhiteSpace(normalizedPartType) && partTypes.TryGetValue(normalizedPartType, out var mappedPartTypeId))
-                    {
-                        partTypeId = mappedPartTypeId;
-                    }
-
-                    Guid? brandId = null;
-                    if (!string.IsNullOrWhiteSpace(normalizedBrand) && brands.TryGetValue(normalizedBrand, out var mappedBrandId))
-                    {
-                        brandId = mappedBrandId;
-                    }
-
-                    Guid? modelId = null;
-                    if (brandId.HasValue && !string.IsNullOrWhiteSpace(normalizedModel) && models.TryGetValue((normalizedBrand, normalizedModel), out var mappedModelId))
-                    {
-                        modelId = mappedModelId;
-                    }
-
-                    var existingProduct = await _db.Products.FirstOrDefaultAsync(x => x.TenantId == job.TenantId && !x.IsDeleted && x.Sku.ToLower() == sku.ToLower(), ct);
-                    if (existingProduct == null)
-                    {
-                        existingProduct = new Product
+                        processed++;
+                        try
                         {
-                            TenantId = job.TenantId,
-                            CategoryId = categoryId,
-                            PartTypeId = partTypeId,
-                            BrandId = brandId,
-                            ModelId = modelId,
-                            Sku = sku,
-                            Name = row.ProductName,
-                            ShortDescription = row.ShortDescription,
-                            LongDescription = row.LongDescription,
-                            Specifications = row.Specifications,
-                            TrackingType = ParseTrackingType(row.TrackingType),
-                            QualityType = ParseQualityType(row.QualityType),
-                            BaseCurrencyId = tenant.DefaultSellingCurrencyId,
-                            BasePrice = 0,
-                            DefaultBuyingPrice = 0,
-                            DefaultSellingPrice = 0,
-                            DefaultPricingMode = PricingMode.Direct,
-                            WarrantyDays = 0,
-                            LowStockThreshold = 5
-                        };
+                            var sku = string.IsNullOrWhiteSpace(row.Sku) ? GenerateSku(row.ProductName, row.RowNumber) : row.Sku.Trim();
+                            var normalizedCategory = Normalize(row.NewCategory);
+                            var normalizedPartType = Normalize(row.NewPartType);
+                            var normalizedBrand = Normalize(row.NewBrand);
+                            var normalizedModel = Normalize(row.NewModel);
 
-                        if (!string.IsNullOrWhiteSpace(row.DownloadedImageLocalPath))
-                        {
-                            existingProduct.Images.Add(new ProductImage
+                            Guid? categoryId = null;
+                            if (!string.IsNullOrWhiteSpace(normalizedCategory) && categories.TryGetValue(normalizedCategory, out var mappedCategoryId))
                             {
-                                TenantId = job.TenantId,
-                                FilePath = row.DownloadedImageLocalPath.Trim(),
-                                IsPrimary = true,
-                                SortOrder = 0
-                            });
+                                categoryId = mappedCategoryId;
+                            }
+
+                            Guid? partTypeId = null;
+                            if (!string.IsNullOrWhiteSpace(normalizedPartType) && partTypes.TryGetValue(normalizedPartType, out var mappedPartTypeId))
+                            {
+                                partTypeId = mappedPartTypeId;
+                            }
+
+                            Guid? brandId = null;
+                            if (!string.IsNullOrWhiteSpace(normalizedBrand) && brands.TryGetValue(normalizedBrand, out var mappedBrandId))
+                            {
+                                brandId = mappedBrandId;
+                            }
+
+                            Guid? modelId = null;
+                            if (brandId.HasValue && !string.IsNullOrWhiteSpace(normalizedModel) && models.TryGetValue((normalizedBrand, normalizedModel), out var mappedModelId))
+                            {
+                                modelId = mappedModelId;
+                            }
+
+                            var existingProduct = await _db.Products.FirstOrDefaultAsync(x => x.TenantId == job.TenantId && !x.IsDeleted && x.Sku.ToLower() == sku.ToLower(), ct);
+                            if (existingProduct == null)
+                            {
+                                existingProduct = new Product
+                                {
+                                    TenantId = job.TenantId,
+                                    CategoryId = categoryId,
+                                    PartTypeId = partTypeId,
+                                    BrandId = brandId,
+                                    ModelId = modelId,
+                                    Sku = sku,
+                                    Name = row.ProductName,
+                                    ShortDescription = row.ShortDescription,
+                                    LongDescription = row.LongDescription,
+                                    Specifications = row.Specifications,
+                                    TrackingType = ParseTrackingType(row.TrackingType),
+                                    QualityType = ParseQualityType(row.QualityType),
+                                    BaseCurrencyId = tenant.DefaultSellingCurrencyId,
+                                    BasePrice = 0,
+                                    DefaultBuyingPrice = 0,
+                                    DefaultSellingPrice = 0,
+                                    DefaultPricingMode = PricingMode.Direct,
+                                    WarrantyDays = 0,
+                                    LowStockThreshold = 5
+                                };
+
+                                if (!string.IsNullOrWhiteSpace(row.DownloadedImageLocalPath))
+                                {
+                                    existingProduct.Images.Add(new ProductImage
+                                    {
+                                        TenantId = job.TenantId,
+                                        FilePath = row.DownloadedImageLocalPath.Trim(),
+                                        IsPrimary = true,
+                                        SortOrder = 0
+                                    });
+                                }
+
+                                _db.Products.Add(existingProduct);
+                            }
+
+                            var item = existingItems.GetValueOrDefault(row.RowNumber);
+                            if (item == null)
+                            {
+                                item = new BulkUploadJobItem
+                                {
+                                    TenantId = job.TenantId,
+                                    JobId = jobId,
+                                    RowNumber = row.RowNumber
+                                };
+                                _db.BulkUploadJobItems.Add(item);
+                                existingItems[row.RowNumber] = item;
+                            }
+
+                            item.Status = BulkUploadRowStatus.Completed;
+                            item.ProductId = existingProduct.Id;
+                            item.ErrorMessage = null;
+                            success++;
                         }
-
-                        _db.Products.Add(existingProduct);
-                    }
-
-                    var item = existingItems.GetValueOrDefault(row.RowNumber);
-                    if (item == null)
-                    {
-                        item = new BulkUploadJobItem
+                        catch (Exception ex)
                         {
-                            TenantId = job.TenantId,
-                            JobId = jobId,
-                            RowNumber = row.RowNumber
-                        };
-                        _db.BulkUploadJobItems.Add(item);
-                        existingItems[row.RowNumber] = item;
+                            _logger.LogWarning(ex, "Failed processing row {RowNumber} for job {JobId}", row.RowNumber, jobId);
+                            var item = existingItems.GetValueOrDefault(row.RowNumber);
+                            if (item == null)
+                            {
+                                item = new BulkUploadJobItem
+                                {
+                                    TenantId = job.TenantId,
+                                    JobId = jobId,
+                                    RowNumber = row.RowNumber
+                                };
+                                _db.BulkUploadJobItems.Add(item);
+                                existingItems[row.RowNumber] = item;
+                            }
+
+                            item.Status = BulkUploadRowStatus.Failed;
+                            item.ErrorMessage = ex.Message;
+                            item.ProductId = null;
+                            fail++;
+                        }
                     }
 
-                    item.Status = BulkUploadRowStatus.Completed;
-                    item.ProductId = existingProduct.Id;
-                    item.ErrorMessage = null;
-                    success++;
+                    await _db.SaveChangesAsync(ct);
+                    await tx.CommitAsync(ct);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed processing row {RowNumber} for job {JobId}", row.RowNumber, jobId);
-                    var item = existingItems.GetValueOrDefault(row.RowNumber);
-                    if (item == null)
-                    {
-                        item = new BulkUploadJobItem
-                        {
-                            TenantId = job.TenantId,
-                            JobId = jobId,
-                            RowNumber = row.RowNumber
-                        };
-                        _db.BulkUploadJobItems.Add(item);
-                        existingItems[row.RowNumber] = item;
-                    }
-
-                    item.Status = BulkUploadRowStatus.Failed;
-                    item.ErrorMessage = ex.Message;
-                    item.ProductId = null;
-                    fail++;
+                    await tx.RollbackAsync(ct);
+                    _logger.LogError(ex, "Chunk processing failed for job {JobId}. Chunk start row: {StartRow}", jobId, chunk.First().RowNumber);
                 }
             }
-
-            await _db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
 
             var totalCompleted = await _db.BulkUploadJobItems.CountAsync(x => x.JobId == jobId && x.Status == BulkUploadRowStatus.Completed && !x.IsDeleted, ct);
             var totalFailed = await _db.BulkUploadJobItems.CountAsync(x => x.JobId == jobId && x.Status == BulkUploadRowStatus.Failed && !x.IsDeleted, ct);
@@ -253,18 +266,21 @@ public class BulkProductUploadProcessor
         var existing = await _db.Categories.Where(x => x.TenantId == tenantId && !x.IsDeleted).ToListAsync(ct);
         var map = existing.ToDictionary(x => Normalize(x.Name), x => x.Id);
 
-        foreach (var key in names)
+        foreach (var chunk in ChunkRows(names, _chunkSize))
         {
-            if (!map.ContainsKey(key))
+            foreach (var key in chunk)
             {
-                var display = rows.First(x => Normalize(x.NewCategory) == key).NewCategory.Trim();
-                var entity = new Category { TenantId = tenantId, Name = display, Code = BuildCode(display, "CAT") };
-                _db.Categories.Add(entity);
-                map[key] = entity.Id;
+                if (!map.ContainsKey(key))
+                {
+                    var display = rows.First(x => Normalize(x.NewCategory) == key).NewCategory.Trim();
+                    var entity = new Category { TenantId = tenantId, Name = display, Code = BuildCode(display, "CAT") };
+                    _db.Categories.Add(entity);
+                    map[key] = entity.Id;
+                }
             }
-        }
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
         return map;
     }
 
@@ -274,18 +290,21 @@ public class BulkProductUploadProcessor
         var existing = await _db.PartTypes.Where(x => x.TenantId == tenantId && !x.IsDeleted).ToListAsync(ct);
         var map = existing.ToDictionary(x => Normalize(x.Name), x => x.Id);
 
-        foreach (var key in names)
+        foreach (var chunk in ChunkRows(names, _chunkSize))
         {
-            if (!map.ContainsKey(key))
+            foreach (var key in chunk)
             {
-                var display = rows.First(x => Normalize(x.NewPartType) == key).NewPartType.Trim();
-                var entity = new PartType { TenantId = tenantId, Name = display, Code = BuildCode(display, "PT") };
-                _db.PartTypes.Add(entity);
-                map[key] = entity.Id;
+                if (!map.ContainsKey(key))
+                {
+                    var display = rows.First(x => Normalize(x.NewPartType) == key).NewPartType.Trim();
+                    var entity = new PartType { TenantId = tenantId, Name = display, Code = BuildCode(display, "PT") };
+                    _db.PartTypes.Add(entity);
+                    map[key] = entity.Id;
+                }
             }
-        }
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
         return map;
     }
 
@@ -295,18 +314,21 @@ public class BulkProductUploadProcessor
         var existing = await _db.Brands.Where(x => x.TenantId == tenantId && !x.IsDeleted).ToListAsync(ct);
         var map = existing.ToDictionary(x => Normalize(x.Name), x => x.Id);
 
-        foreach (var key in names)
+        foreach (var chunk in ChunkRows(names, _chunkSize))
         {
-            if (!map.ContainsKey(key))
+            foreach (var key in chunk)
             {
-                var display = rows.First(x => Normalize(x.NewBrand) == key).NewBrand.Trim();
-                var entity = new Brand { TenantId = tenantId, Name = display, Code = BuildCode(display, "BR") };
-                _db.Brands.Add(entity);
-                map[key] = entity.Id;
+                if (!map.ContainsKey(key))
+                {
+                    var display = rows.First(x => Normalize(x.NewBrand) == key).NewBrand.Trim();
+                    var entity = new Brand { TenantId = tenantId, Name = display, Code = BuildCode(display, "BR") };
+                    _db.Brands.Add(entity);
+                    map[key] = entity.Id;
+                }
             }
-        }
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(ct);
+        }
         return map;
     }
 
@@ -322,24 +344,44 @@ public class BulkProductUploadProcessor
         var map = existing.ToDictionary(x => (Brand: x.BrandId.ToString(), Model: Normalize(x.Name)), x => x.Id);
         var result = new Dictionary<(string Brand, string Model), Guid>();
 
-        foreach (var key in keys)
+        foreach (var chunk in ChunkRows(keys, _chunkSize))
         {
-            var brandId = brands[key.Brand];
-            var lookup = (Brand: brandId.ToString(), Model: key.Model);
-            if (!map.TryGetValue(lookup, out var modelId))
+            foreach (var key in chunk)
             {
-                var display = rows.First(x => Normalize(x.NewBrand) == key.Brand && Normalize(x.NewModel) == key.Model).NewModel.Trim();
-                var entity = new DeviceModel { TenantId = tenantId, BrandId = brandId, Name = display, Code = BuildCode(display, "MDL") };
-                _db.DeviceModels.Add(entity);
-                modelId = entity.Id;
-                map[lookup] = modelId;
+                var brandId = brands[key.Brand];
+                var lookup = (Brand: brandId.ToString(), Model: key.Model);
+                if (!map.TryGetValue(lookup, out var modelId))
+                {
+                    var display = rows.First(x => Normalize(x.NewBrand) == key.Brand && Normalize(x.NewModel) == key.Model).NewModel.Trim();
+                    var entity = new DeviceModel { TenantId = tenantId, BrandId = brandId, Name = display, Code = BuildCode(display, "MDL") };
+                    _db.DeviceModels.Add(entity);
+                    modelId = entity.Id;
+                    map[lookup] = modelId;
+                }
+
+                result[key] = modelId;
             }
 
-            result[key] = modelId;
+            await _db.SaveChangesAsync(ct);
+        }
+        return result;
+    }
+
+    private static IEnumerable<List<T>> ChunkRows<T>(IEnumerable<T> source, int chunkSize)
+    {
+        var chunk = new List<T>(chunkSize);
+        foreach (var item in source)
+        {
+            chunk.Add(item);
+            if (chunk.Count < chunkSize) continue;
+            yield return chunk;
+            chunk = new List<T>(chunkSize);
         }
 
-        await _db.SaveChangesAsync(ct);
-        return result;
+        if (chunk.Count > 0)
+        {
+            yield return chunk;
+        }
     }
 
     private static string BuildCode(string input, string prefix)
