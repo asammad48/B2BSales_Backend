@@ -58,6 +58,14 @@ public class BulkProductUploadProcessor
             var brands = await UpsertBrandsAsync(job.TenantId, pendingRows, ct);
             var models = await UpsertModelsAsync(job.TenantId, pendingRows, brands, ct);
             var tenant = await _db.Tenants.FirstAsync(x => x.Id == job.TenantId, ct);
+            var existingSkuSet = (await _db.Products
+                .Where(x => x.TenantId == job.TenantId && !x.IsDeleted)
+                .Select(x => x.Sku)
+                .ToListAsync(ct))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => Normalize(x))
+                .ToHashSet();
+            var generatedSkuCounts = new Dictionary<string, int>();
 
             var success = 0;
             var fail = 0;
@@ -73,7 +81,8 @@ public class BulkProductUploadProcessor
                         processed++;
                         try
                         {
-                            var sku = string.IsNullOrWhiteSpace(row.Sku) ? GenerateSku(row.ProductName, row.RowNumber) : row.Sku.Trim();
+                            var requestedSku = string.IsNullOrWhiteSpace(row.Sku) ? GenerateSku(row.ProductName, row.RowNumber) : row.Sku.Trim();
+                            var sku = EnsureUniqueSku(requestedSku, existingSkuSet, generatedSkuCounts);
                             var normalizedCategory = Normalize(row.NewCategory);
                             var normalizedPartType = Normalize(row.NewPartType);
                             var normalizedBrand = Normalize(row.NewBrand);
@@ -141,6 +150,7 @@ public class BulkProductUploadProcessor
                                 }
 
                                 _db.Products.Add(existingProduct);
+                                existingSkuSet.Add(Normalize(existingProduct.Sku));
                             }
 
                             var item = existingItems.GetValueOrDefault(row.RowNumber);
@@ -396,6 +406,42 @@ public class BulkProductUploadProcessor
         var slug = new string(productName.Where(char.IsLetterOrDigit).Take(8).ToArray()).ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(slug)) slug = "ITEM";
         return $"AUTO-{slug}-{rowNumber.ToString(CultureInfo.InvariantCulture)}";
+    }
+
+    private static string EnsureUniqueSku(string inputSku, HashSet<string> existingSkus, Dictionary<string, int> generatedSkuCounts)
+    {
+        var baseSku = inputSku.Trim();
+        if (string.IsNullOrWhiteSpace(baseSku))
+        {
+            baseSku = "AUTO-ITEM";
+        }
+
+        var normalizedBaseSku = Normalize(baseSku);
+        if (existingSkus.Add(normalizedBaseSku))
+        {
+            generatedSkuCounts[normalizedBaseSku] = 0;
+            return baseSku;
+        }
+
+        var sequence = generatedSkuCounts.TryGetValue(normalizedBaseSku, out var usedCount) ? usedCount + 1 : 1;
+        while (true)
+        {
+            var candidate = $"{BuildSkuPrefix(sequence)}-{baseSku}";
+            if (existingSkus.Add(Normalize(candidate)))
+            {
+                generatedSkuCounts[normalizedBaseSku] = sequence;
+                return candidate;
+            }
+
+            sequence++;
+        }
+    }
+
+    private static string BuildSkuPrefix(int sequence)
+    {
+        var letterIndex = (sequence - 1) % 26;
+        var letter = (char)('A' + letterIndex);
+        return $"{sequence}{letter}";
     }
 
     private static string Normalize(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant();

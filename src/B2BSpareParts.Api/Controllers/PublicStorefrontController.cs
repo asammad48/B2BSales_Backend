@@ -37,8 +37,8 @@ public class PublicStorefrontController : ControllerBase
     public async Task<ActionResult<ApiResponse<ThemeResponseDto>>> GetTheme(CancellationToken ct)
         => Ok(ApiResponse<ThemeResponseDto>.Ok(await _themeService.GetAsync(ct)));
 
-    [HttpGet("storefront/products")]
-    public async Task<ActionResult<ApiResponse<PageResponse<ProductListItemResponseDto>>>> GetProducts([FromQuery] PageRequest request, CancellationToken ct)
+    [HttpPost("storefront/products")]
+    public async Task<ActionResult<ApiResponse<PageResponse<ProductListItemResponseDto>>>> GetProducts([FromBody] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<ProductListItemResponseDto>>.Ok(await _productService.GetPagedAsync(request, ct)));
 
     [HttpGet("storefront/products/{id:guid}")]
