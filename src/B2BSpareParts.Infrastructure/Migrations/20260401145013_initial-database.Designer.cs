@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace B2BSpareParts.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260323224908_addedserilizedjson")]
-    partial class addedserilizedjson
+    [Migration("20260401145013_initial-database")]
+    partial class initialdatabase
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -113,6 +113,98 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Brands");
+                });
+
+            modelBuilder.Entity("B2BSpareParts.Domain.Entities.BulkUpload.BulkUploadJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<int>("FailedRows")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ProcessedRows")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SuccessfulRows")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TotalRows")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BulkUploadJobs");
+                });
+
+            modelBuilder.Entity("B2BSpareParts.Domain.Entities.BulkUpload.BulkUploadJobItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RowNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId", "RowNumber")
+                        .IsUnique();
+
+                    b.ToTable("BulkUploadJobItems");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Category", b =>
@@ -662,7 +754,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Property<Guid?>("BrandId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
@@ -1115,6 +1207,10 @@ namespace B2BSpareParts.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DestinationShopId");
+
+                    b.HasIndex("SourceShopId");
+
                     b.ToTable("StockTransfers");
                 });
 
@@ -1267,6 +1363,17 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("B2BSpareParts.Domain.Entities.BulkUpload.BulkUploadJobItem", b =>
+                {
+                    b.HasOne("B2BSpareParts.Domain.Entities.BulkUpload.BulkUploadJob", "Job")
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Job");
+                });
+
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.Category", b =>
                 {
                     b.HasOne("B2BSpareParts.Domain.Entities.Category", "ParentCategory")
@@ -1392,9 +1499,7 @@ namespace B2BSpareParts.Infrastructure.Migrations
 
                     b.HasOne("B2BSpareParts.Domain.Entities.Category", "Category")
                         .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CategoryId");
 
                     b.HasOne("B2BSpareParts.Domain.Entities.DeviceModel", "Model")
                         .WithMany()
@@ -1548,6 +1653,25 @@ namespace B2BSpareParts.Infrastructure.Migrations
                     b.Navigation("SerializedInventoryUnit");
 
                     b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("B2BSpareParts.Domain.Entities.StockTransfer", b =>
+                {
+                    b.HasOne("B2BSpareParts.Domain.Entities.Shop", "DestinationShop")
+                        .WithMany()
+                        .HasForeignKey("DestinationShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("B2BSpareParts.Domain.Entities.Shop", "SourceShop")
+                        .WithMany()
+                        .HasForeignKey("SourceShopId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("DestinationShop");
+
+                    b.Navigation("SourceShop");
                 });
 
             modelBuilder.Entity("B2BSpareParts.Domain.Entities.StockTransferItem", b =>
