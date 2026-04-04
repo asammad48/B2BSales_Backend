@@ -147,6 +147,17 @@ public class PublicCatalogService : IPublicCatalogService
 
     public async Task<PageResponse<PublicProductListItemDto>> GetProductsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
+        if (!request.ShopId.HasValue || request.ShopId.Value == Guid.Empty)
+        {
+            return new PageResponse<PublicProductListItemDto>
+            {
+                Items = [],
+                TotalCount = 0,
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize
+            };
+        }
+
         var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
@@ -158,7 +169,7 @@ public class PublicCatalogService : IPublicCatalogService
             .Include(x => x.Images)
             .Include(x => x.Tenant)
             .ThenInclude(t => t!.BaseCurrency)
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
         var categoryIds = request.GetCategoryFilterIds();
         if (categoryIds.Count > 0)
@@ -175,27 +186,6 @@ public class PublicCatalogService : IPublicCatalogService
         var partTypeIds = request.GetPartTypeFilterIds();
         if (partTypeIds.Count > 0)
             query = query.Where(x => x.PartTypeId.HasValue && partTypeIds.Contains(x.PartTypeId.Value));
-
-
-        if (request.ShopId.HasValue)
-        {
-            query = query.Where(x =>
-                (x.TrackingType == TrackingType.Serializado &&
-                    _db.SerializedInventoryUnits.Any(u =>
-                        u.TenantId == tenantId &&
-                        u.ShopId == request.ShopId.Value &&
-                        u.ProductId == x.Id &&
-                        u.Status == SerializedUnitStatus.InStock &&
-                        !u.IsDeleted)) ||
-                (x.TrackingType != TrackingType.Serializado &&
-                    _db.ShopInventories.Any(i =>
-                        i.TenantId == tenantId &&
-                        i.ShopId == request.ShopId.Value &&
-                        i.ProductId == x.Id &&
-                        i.QuantityOnHand > 0 &&
-                        !i.IsDeleted))
-            );
-        }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -243,7 +233,9 @@ public class PublicCatalogService : IPublicCatalogService
                             i.ProductId == x.Id &&
                             (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
                             !i.IsDeleted)
-                        .Sum(i => i.QuantityOnHand),
+                        .Select(i => i.QuantityOnHand)
+                        .DefaultIfEmpty(0)
+                        .Sum(),
                 QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
@@ -257,7 +249,9 @@ public class PublicCatalogService : IPublicCatalogService
                             i.ProductId == x.Id &&
                             (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
                             !i.IsDeleted)
-                        .Sum(i => i.QuantityOnHand),
+                        .Select(i => i.QuantityOnHand)
+                        .DefaultIfEmpty(0)
+                        .Sum(),
                 IsInStock = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
