@@ -37,11 +37,11 @@ public class PublicStorefrontController : ControllerBase
     public async Task<ActionResult<ApiResponse<ThemeResponseDto>>> GetTheme(CancellationToken ct)
         => Ok(ApiResponse<ThemeResponseDto>.Ok(await _themeService.GetAsync(ct)));
 
-    [HttpPost("storefront/products")]
+    [HttpPost("storefront/public-products")]
     public async Task<ActionResult<ApiResponse<PageResponse<ProductListItemResponseDto>>>> GetProducts([FromBody] PageRequest request, CancellationToken ct)
         => Ok(ApiResponse<PageResponse<ProductListItemResponseDto>>.Ok(await _productService.GetPagedAsync(request, ct)));
 
-    [HttpGet("storefront/products/{id:guid}")]
+    [HttpGet("storefront/public-products/{id:guid}")]
     public async Task<ActionResult<ApiResponse<ProductDetailResponseDto>>> GetProduct(Guid id, CancellationToken ct)
         => Ok(ApiResponse<ProductDetailResponseDto>.Ok(await _productService.GetByIdAsync(id, ct)));
 
