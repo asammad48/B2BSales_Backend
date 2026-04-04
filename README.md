@@ -87,8 +87,8 @@ All DTO class names end with the `Dto` suffix.
 ## Public Website Support
 Public storefront endpoints are included for a non-logged-in website:
 - `GET /api/public/storefront/theme`
-- `GET /api/public/storefront/products`
-- `GET /api/public/storefront/products/{id}`
+- `POST /api/public/storefront/public-products`
+- `GET /api/public/storefront/public-products/{id}`
 
 For guests:
 - prices are locked
