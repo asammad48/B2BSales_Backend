@@ -25,7 +25,7 @@ public class PublicCatalogService : IPublicCatalogService
 
         var baseQuery = _db.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
         var categories = await baseQuery
             .Where(x => x.CategoryId != null && x.Category != null)
