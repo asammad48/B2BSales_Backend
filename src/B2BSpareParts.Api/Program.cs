@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 using B2BSpareParts.Api.Services;
 using B2BSpareParts.Application.Common;
 using B2BSpareParts.Application.Contracts;
-using B2BSpareParts.Common;
 using B2BSpareParts.Infrastructure;
 using B2BSpareParts.Infrastructure.Persistence;
 using B2BSpareParts.Infrastructure.Seeding;

@@ -25,7 +25,7 @@ public class PublicCatalogService : IPublicCatalogService
 
         var baseQuery = _db.Products
             .AsNoTracking()
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
         var categories = await baseQuery
             .Where(x => x.CategoryId != null && x.Category != null)
@@ -158,7 +158,7 @@ public class PublicCatalogService : IPublicCatalogService
             .Include(x => x.Images)
             .Include(x => x.Tenant)
             .ThenInclude(t => t!.BaseCurrency)
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
         var categoryIds = request.GetCategoryFilterIds();
         if (categoryIds.Count > 0)
@@ -351,7 +351,7 @@ public class PublicCatalogService : IPublicCatalogService
             .Include(x => x.Images)
             .Include(x => x.Tenant)
             .ThenInclude(t => t!.BaseCurrency)
-            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted && x.IsPublicVisible);
+            .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
         if (shopId.HasValue)
         {

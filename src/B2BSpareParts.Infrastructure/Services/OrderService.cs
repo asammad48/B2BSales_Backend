@@ -278,7 +278,7 @@ public class OrderService : IOrderService
             var product = products.FirstOrDefault(x => x.Id == item.ProductId)
                           ?? throw new AppException($"Product {item.ProductId} not found", 404);
 
-            if (!product.IsActive || !product.IsPublicVisible)
+            if (!product.IsActive)
                 throw new AppException($"Product {product.Name} is not available for order", 400);
 
             ValidateRequestedQuantity(item.Quantity, product.Name);

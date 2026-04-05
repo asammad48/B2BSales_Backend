@@ -29,7 +29,7 @@ public class ProductService : IProductService
 
         if (isGuestView)
         {
-            query = query.Where(x => x.IsPublicVisible && x.IsActive);
+            query = query.Where(x => x.IsActive);
         }
 
         if (!string.IsNullOrWhiteSpace(request.Search))
