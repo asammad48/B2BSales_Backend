@@ -49,36 +49,31 @@ jobs:
           ssh -p "${{ secrets.VPS_PORT }}" -o StrictHostKeyChecking=no \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" << 'EOF'
               set -euo pipefail
-
+      
               APP_DIR="/opt/apps/mobia2z-backend"
               CURRENT_DIR="/opt/apps/mobia2z-backend/current"
               INCOMING_FILE="/tmp/mobia2z-backend.tar.gz"
               EXTRACT_DIR="/tmp/mobia2z-backend-extract"
               SERVICE_NAME="mobia2z-backend"
-
+      
               mkdir -p "$APP_DIR"
               mkdir -p "$CURRENT_DIR"
               mkdir -p "$APP_DIR/shared/content"
               mkdir -p "$CURRENT_DIR/uploads"
-
+      
               rm -rf "$EXTRACT_DIR"
               mkdir -p "$EXTRACT_DIR"
-
+      
               tar -xzf "$INCOMING_FILE" -C "$EXTRACT_DIR"
-
-              find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 \
-                ! -name 'uploads' \
-                -exec rm -rf {} +
-
+      
+              find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 ! -name 'uploads' -exec rm -rf {} +
+      
               cp -a "$EXTRACT_DIR"/. "$CURRENT_DIR"/
-
-              sudo chown -R www-data:www-data "$CURRENT_DIR/uploads"
-              sudo chmod -R 755 "$CURRENT_DIR/uploads"
-
+      
               sudo systemctl restart "$SERVICE_NAME"
               sudo nginx -t
               sudo systemctl reload nginx
-
+      
               rm -rf "$EXTRACT_DIR"
               rm -f "$INCOMING_FILE"
           EOF
