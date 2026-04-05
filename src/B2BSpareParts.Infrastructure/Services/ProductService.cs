@@ -56,6 +56,7 @@ public class ProductService : IProductService
                 PartTypeName = x.PartType != null ? x.PartType.Name : null,
                 TrackingType = x.TrackingType,
                 QualityType = x.QualityType,
+                DefaultBuyingPrice = isGuestView ? null : x.DefaultBuyingPrice,
                 DefaultSellingPrice = x.DefaultSellingPrice,
                 PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
                 QuantityInHand = x.TrackingType == TrackingType.Serializado

@@ -18,6 +18,7 @@ public class ProductListItemResponseDto
     public string? PartTypeName { get; set; }
     public TrackingType TrackingType { get; set; }
     public QualityType QualityType { get; set; }
+    public decimal? DefaultBuyingPrice { get; set; }
     public decimal? DefaultSellingPrice { get; set; }
     public string? PrimaryImageUrl { get; set; }
     public int QuantityInHand { get; set; }
