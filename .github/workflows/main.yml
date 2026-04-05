@@ -1,0 +1,79 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_DIR: /opt/apps/mobia2z-backend
+      CURRENT_DIR: /opt/apps/mobia2z-backend/current
+      INCOMING_FILE: /tmp/mobia2z-backend.tar.gz
+      SERVICE_NAME: mobia2z-backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish
+        run: dotnet publish ./src/B2BSpareParts.Api/B2BSpareParts.Api.csproj -c Release -o ./publish
+
+      - name: Package
+        run: tar -czf backend.tar.gz -C ./publish .
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Upload package
+        run: |
+          scp -P "${{ secrets.VPS_PORT }}" -o StrictHostKeyChecking=no \
+            backend.tar.gz \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.INCOMING_FILE }}"
+
+      - name: Deploy on VPS
+        run: |
+          ssh -p "${{ secrets.VPS_PORT }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" << 'EOF'
+              set -euo pipefail
+      
+              APP_DIR="/opt/apps/mobia2z-backend"
+              CURRENT_DIR="/opt/apps/mobia2z-backend/current"
+              INCOMING_FILE="/tmp/mobia2z-backend.tar.gz"
+              EXTRACT_DIR="/tmp/mobia2z-backend-extract"
+              SERVICE_NAME="mobia2z-backend"
+      
+              mkdir -p "$APP_DIR"
+              mkdir -p "$CURRENT_DIR"
+              mkdir -p "$APP_DIR/shared/content"
+              mkdir -p "$CURRENT_DIR/uploads"
+      
+              rm -rf "$EXTRACT_DIR"
+              mkdir -p "$EXTRACT_DIR"
+      
+              tar -xzf "$INCOMING_FILE" -C "$EXTRACT_DIR"
+      
+              find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 ! -name 'uploads' -exec rm -rf {} +
+      
+              cp -a "$EXTRACT_DIR"/. "$CURRENT_DIR"/
+      
+              sudo systemctl restart "$SERVICE_NAME"
+              sudo nginx -t
+              sudo systemctl reload nginx
+      
+              rm -rf "$EXTRACT_DIR"
+              rm -f "$INCOMING_FILE"
+          EOF
