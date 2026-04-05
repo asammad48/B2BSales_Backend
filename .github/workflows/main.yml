@@ -59,14 +59,21 @@ jobs:
               mkdir -p "$APP_DIR"
               mkdir -p "$CURRENT_DIR"
               mkdir -p "$APP_DIR/shared/content"
+              mkdir -p "$CURRENT_DIR/uploads"
+
               rm -rf "$EXTRACT_DIR"
               mkdir -p "$EXTRACT_DIR"
 
               tar -xzf "$INCOMING_FILE" -C "$EXTRACT_DIR"
 
-              find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+              find "$CURRENT_DIR" -mindepth 1 -maxdepth 1 \
+                ! -name 'uploads' \
+                -exec rm -rf {} +
 
               cp -a "$EXTRACT_DIR"/. "$CURRENT_DIR"/
+
+              sudo chown -R www-data:www-data "$CURRENT_DIR/uploads"
+              sudo chmod -R 755 "$CURRENT_DIR/uploads"
 
               sudo systemctl restart "$SERVICE_NAME"
               sudo nginx -t
