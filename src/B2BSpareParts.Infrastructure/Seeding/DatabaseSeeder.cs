@@ -23,19 +23,46 @@ public class DatabaseSeeder
 
         var hasher = new PasswordHasher<AppUser>();
 
-        var english = new Language { Code = "en", Name = "English" };
-        var urdu = new Language { Code = "ur", Name = "Urdu", IsRtl = true };
-        var euro = new Currency { Code = "EUR", Name = "Euro", Symbol = "€" };
-        var yuan = new Currency { Code = "CNY", Name = "Chinese Yuan", Symbol = "¥" };
-        var pkr = new Currency { Code = "PKR", Name = "Pakistani Rupee", Symbol = "₨" };
+        //var english = new Language { Code = "en", Name = "English" };
+        //var urdu = new Language { Code = "ur", Name = "Urdu", IsRtl = true };
+        //var euro = new Currency { Code = "EUR", Name = "Euro", Symbol = "€" };
+        //var yuan = new Currency { Code = "CNY", Name = "Chinese Yuan", Symbol = "¥" };
+        //var pkr = new Currency { Code = "PKR", Name = "Pakistani Rupee", Symbol = "₨" };
 
-        _db.Languages.AddRange(english, urdu);
-        _db.Currencies.AddRange(euro, yuan, pkr);
+        //_db.Languages.AddRange(english, urdu);
+        //_db.Currencies.AddRange(euro, yuan, pkr);
+        //await _db.SaveChangesAsync(ct);
+        var euro = new Currency { Code = "EUR", Name = "Euro", Symbol = "€" };
+        var gbp = new Currency { Code = "GBP", Name = "British Pound", Symbol = "£" };
+        var chf = new Currency { Code = "CHF", Name = "Swiss Franc", Symbol = "CHF" };
+        var sek = new Currency { Code = "SEK", Name = "Swedish Krona", Symbol = "kr" };
+        var nok = new Currency { Code = "NOK", Name = "Norwegian Krone", Symbol = "kr" };
+        var dkk = new Currency { Code = "DKK", Name = "Danish Krone", Symbol = "kr" };
+        var pln = new Currency { Code = "PLN", Name = "Polish Zloty", Symbol = "zł" };
+        var czk = new Currency { Code = "CZK", Name = "Czech Koruna", Symbol = "Kč" };
+        var huf = new Currency { Code = "HUF", Name = "Hungarian Forint", Symbol = "Ft" };
+        var ron = new Currency { Code = "RON", Name = "Romanian Leu", Symbol = "lei" };
+        var yuan = new Currency { Code = "CNY", Name = "Chinese Yuan", Symbol = "¥" };
+
+        _db.Currencies.AddRange(
+            euro, gbp, chf, sek, nok, dkk, pln, czk, huf, ron, yuan
+        );
+
+        var spanish = new Language { Code = "es", Name = "Spanish" }; // Official nationwide
+        var catalan = new Language { Code = "ca", Name = "Catalan" };
+        var basque = new Language { Code = "eu", Name = "Basque" };
+        var galician = new Language { Code = "gl", Name = "Galician" };
+        var valencian = new Language { Code = "val", Name = "Valencian" }; // variant of Catalan
+        var english = new Language { Code = "en", Name = "English" };
+        _db.Languages.AddRange(
+            spanish, catalan, basque, galician, valencian,english
+        );
+
         await _db.SaveChangesAsync(ct);
 
         var tenant = new Tenant
         {
-            Name = "Demo Mobile Parts",
+            Name = "Mobia2Z",
             Code = ApiConstants.DefaultTenantCode,
             DefaultLanguageId = english.Id,
             DefaultSellingCurrencyId = euro.Id
@@ -43,13 +70,28 @@ public class DatabaseSeeder
         _db.Tenants.Add(tenant);
         await _db.SaveChangesAsync(ct);
 
-        var mainShop = new Shop { TenantId = tenant.Id, Name = "Main Warehouse", Code = "MAIN", IsMain = true, Address = "Rawalpindi" };
-        var hallRoad = new Shop { TenantId = tenant.Id, Name = "Hall Road Branch", Code = "HALL", Address = "Lahore" };
-        _db.Shops.AddRange(mainShop, hallRoad);
+        var madridShop = new Shop
+        {
+            TenantId = tenant.Id,
+            Name = "Madrid Central Warehouse",
+            Code = "MAD",
+            IsMain = true,
+            Address = "Calle de Alcalá 45, 28014 Madrid, Spain"
+        };
 
-        var owner = new AppUser { TenantId = tenant.Id, FullName = "Owner User", Email = "owner@demo.local", Role = UserRoles.Owner, ShopId = mainShop.Id };
+        var barcelonaShop = new Shop
+        {
+            TenantId = tenant.Id,
+            Name = "Barcelona Branch",
+            Code = "BCN",
+            Address = "Avinguda Diagonal 640, 08017 Barcelona, Spain"
+        };
+
+        _db.Shops.AddRange(madridShop, barcelonaShop);
+
+        var owner = new AppUser { TenantId = tenant.Id, FullName = "Owner User", Email = "owner@demo.local", Role = UserRoles.Owner, ShopId = madridShop.Id };
         owner.PasswordHash = hasher.HashPassword(owner, "Admin123!");
-        var staff = new AppUser { TenantId = tenant.Id, FullName = "Staff User", Email = "staff@demo.local", Role = UserRoles.Staff, ShopId = mainShop.Id };
+        var staff = new AppUser { TenantId = tenant.Id, FullName = "Staff User", Email = "staff@demo.local", Role = UserRoles.Staff, ShopId = madridShop.Id };
         staff.PasswordHash = hasher.HashPassword(staff, "Staff123!");
         var clientUser = new AppUser { TenantId = tenant.Id, FullName = "Client User", Email = "client@demo.local", Role = UserRoles.Client };
         clientUser.PasswordHash = hasher.HashPassword(clientUser, "Client123!");
@@ -220,16 +262,34 @@ public class DatabaseSeeder
         //);
 
         _db.ExchangeRates.AddRange(
-            new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = euro.Id, ToCurrencyId = yuan.Id, Rate = 7.8m, EffectiveDate = DateTime.UtcNow.Date },
-            new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = pkr.Id, ToCurrencyId = yuan.Id, Rate = 0.025m, EffectiveDate = DateTime.UtcNow.Date }
-        );
+    // Base
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = euro.Id, ToCurrencyId = euro.Id, Rate = 1m, EffectiveDate = DateTime.UtcNow.Date },
+
+    // Major
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = gbp.Id, ToCurrencyId = euro.Id, Rate = 1.15m, EffectiveDate = DateTime.UtcNow.Date }, // GBP → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = chf.Id, ToCurrencyId = euro.Id, Rate = 1.10m, EffectiveDate = DateTime.UtcNow.Date }, // CHF → EUR
+
+    // Nordic
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = sek.Id, ToCurrencyId = euro.Id, Rate = 0.094m, EffectiveDate = DateTime.UtcNow.Date }, // SEK → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = nok.Id, ToCurrencyId = euro.Id, Rate = 0.089m, EffectiveDate = DateTime.UtcNow.Date }, // NOK → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = dkk.Id, ToCurrencyId = euro.Id, Rate = 0.134m, EffectiveDate = DateTime.UtcNow.Date }, // DKK → EUR
+
+    // Eastern Europe
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = pln.Id, ToCurrencyId = euro.Id, Rate = 0.237m, EffectiveDate = DateTime.UtcNow.Date }, // PLN → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = czk.Id, ToCurrencyId = euro.Id, Rate = 0.041m, EffectiveDate = DateTime.UtcNow.Date }, // CZK → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = huf.Id, ToCurrencyId = euro.Id, Rate = 0.0026m, EffectiveDate = DateTime.UtcNow.Date }, // HUF → EUR
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = ron.Id, ToCurrencyId = euro.Id, Rate = 0.196m, EffectiveDate = DateTime.UtcNow.Date }, // RON → EUR
+
+    // Asia
+    new ExchangeRate { TenantId = tenant.Id, FromCurrencyId = yuan.Id, ToCurrencyId = euro.Id, Rate = 0.128m, EffectiveDate = DateTime.UtcNow.Date }
+);
 
         _db.Notifications.Add(new Notification
         {
             TenantId = tenant.Id,
             Type = NotificationType.General,
             Title = "Seed complete",
-            Message = "Demo seed data has been created."
+            Message = "Intial data has been created."
         });
 
         await _db.SaveChangesAsync(ct);
