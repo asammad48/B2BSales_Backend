@@ -160,6 +160,7 @@ public class PublicCatalogService : IPublicCatalogService
 
         var isGuestView = _tenantContext.UserId == null;
         var tenantId = _tenantContext.TenantId;
+        var shopId = request.ShopId!.Value;
         var query = _db.Products
             .AsNoTracking()
             .Include(x => x.Category)
@@ -225,45 +226,41 @@ public class PublicCatalogService : IPublicCatalogService
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
-                        (!request.ShopId.HasValue || u.ShopId == request.ShopId.Value) &&
+                        u.ShopId == shopId &&
                         !u.IsDeleted)
                     : _db.ShopInventories
                         .Where(i =>
                             i.TenantId == tenantId &&
                             i.ProductId == x.Id &&
-                            (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
+                            i.ShopId == shopId &&
                             !i.IsDeleted)
-                        .Select(i => i.QuantityOnHand)
-                        .DefaultIfEmpty(0)
-                        .Sum(),
+                        .Sum(i => i.QuantityOnHand),
                 QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
-                        (!request.ShopId.HasValue || u.ShopId == request.ShopId.Value) &&
+                        u.ShopId == shopId &&
                         !u.IsDeleted)
                     : _db.ShopInventories
                         .Where(i =>
                             i.TenantId == tenantId &&
                             i.ProductId == x.Id &&
-                            (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
+                            i.ShopId == shopId &&
                             !i.IsDeleted)
-                        .Select(i => i.QuantityOnHand)
-                        .DefaultIfEmpty(0)
-                        .Sum(),
+                        .Sum(i => i.QuantityOnHand),
                 IsInStock = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Any(u =>
                         u.TenantId == tenantId &&
                         u.ProductId == x.Id &&
                         u.Status == SerializedUnitStatus.InStock &&
-                        (!request.ShopId.HasValue || u.ShopId == request.ShopId.Value) &&
+                        u.ShopId == shopId &&
                         !u.IsDeleted)
                     : _db.ShopInventories.Any(i =>
                         i.TenantId == tenantId &&
                         i.ProductId == x.Id &&
                         i.QuantityOnHand > 0 &&
-                        (!request.ShopId.HasValue || i.ShopId == request.ShopId.Value) &&
+                        i.ShopId == shopId &&
                         !i.IsDeleted),
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView,
