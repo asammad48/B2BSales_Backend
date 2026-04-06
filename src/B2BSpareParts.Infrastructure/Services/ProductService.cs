@@ -5,6 +5,7 @@ using B2BSpareParts.Domain.Entities;
 using B2BSpareParts.Domain.Enums;
 using B2BSpareParts.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace B2BSpareParts.Infrastructure.Services;
 
@@ -14,12 +15,12 @@ public class ProductService : IProductService
     private readonly ITenantContext _tenantContext;
     private readonly string _imagePublicPathPrefix;
 
-    public ProductService(AppDbContext db, ITenantContext tenantContext, IConfiguration configuration)
+    public ProductService(AppDbContext db, ITenantContext tenantContext, IOptions<FileStorageOptions> fileStorageOptions)
     {
         _db = db;
         _tenantContext = tenantContext;
-        _imagePublicPathPrefix = (configuration["FileStorage:PublicPathPrefix"]
-            ?? configuration["FileStorage:UploadFolder"]
+        _imagePublicPathPrefix = (fileStorageOptions.Value.PublicPathPrefix
+            ?? fileStorageOptions.Value.UploadFolder
             ?? "uploads").Trim().Trim('/').Trim('\\');
     }
 
