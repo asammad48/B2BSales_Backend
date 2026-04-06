@@ -3,6 +3,7 @@ using B2BSpareParts.Application.Contracts;
 using B2BSpareParts.Application.DTOs.Products;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace B2BSpareParts.Api.Controllers;
 
@@ -13,13 +14,13 @@ namespace B2BSpareParts.Api.Controllers;
 public class ProductsController : ControllerBase
 {
     private readonly IProductService _productService;
-    private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
+    private readonly FileStorageOptions _fileStorageOptions;
 
-    public ProductsController(IProductService productService, IConfiguration configuration, IWebHostEnvironment env)
+    public ProductsController(IProductService productService, IOptions<FileStorageOptions> fileStorageOptions, IWebHostEnvironment env)
     {
         _productService = productService;
-        _configuration = configuration;
+        _fileStorageOptions = fileStorageOptions.Value;
         _env = env;
     }
 
@@ -45,8 +46,12 @@ public class ProductsController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<Guid>>> Create([FromForm] CreateProductRequestDto request, [FromForm] List<IFormFile> imageFiles, CancellationToken ct)
     {
-        var uploadFolder = _configuration["FileStorage:UploadFolder"] ?? "uploads";
-        var uploadPath = Path.Combine(_env.ContentRootPath, uploadFolder);
+        var configuredStoragePath = _fileStorageOptions.StoragePath
+            ?? _fileStorageOptions.UploadFolder
+            ?? "uploads";
+        var uploadPath = Path.IsPathRooted(configuredStoragePath)
+            ? configuredStoragePath
+            : Path.GetFullPath(Path.Combine(_env.ContentRootPath, configuredStoragePath));
 
         if (!Directory.Exists(uploadPath))
         {
@@ -71,13 +76,13 @@ public class ProductsController : ControllerBase
                 // If images were already provided in the DTO, update the first matching one or add a new one
                 if (request.Images.Count > i)
                 {
-                    request.Images[i].FilePath = $"{uploadFolder}/{fileName}";
+                    request.Images[i].FilePath = fileName;
                 }
                 else
                 {
                     request.Images.Add(new CreateProductImageRequestDto
                     {
-                        FilePath = $"{uploadFolder}/{fileName}",
+                        FilePath = fileName,
                         IsPrimary = request.Images.Count == 0, // Fallback if no image is marked primary
                         SortOrder = request.Images.Count
                     });

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
@@ -39,6 +40,7 @@ builder.Services.Configure<IISServerOptions>(options =>
 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IAppEnvironment, WebHostAppEnvironment>();
+builder.Services.Configure<FileStorageOptions>(builder.Configuration.GetSection("FileStorage"));
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -134,8 +136,18 @@ app.UseExceptionHandler(handler =>
 app.UseCors("AllowAllOrigins");
 app.UseHttpsRedirection();
 
-var uploadFolder = builder.Configuration["FileStorage:UploadFolder"] ?? "uploads";
-var uploadPath = Path.Combine(builder.Environment.ContentRootPath, uploadFolder);
+var fileStorageOptions = app.Services.GetRequiredService<IOptions<FileStorageOptions>>().Value;
+var configuredStoragePath = fileStorageOptions.StoragePath
+    ?? fileStorageOptions.UploadFolder
+    ?? "uploads";
+var uploadPath = Path.IsPathRooted(configuredStoragePath)
+    ? configuredStoragePath
+    : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, configuredStoragePath));
+
+var publicPathPrefix = fileStorageOptions.PublicPathPrefix
+    ?? fileStorageOptions.UploadFolder
+    ?? "uploads";
+publicPathPrefix = publicPathPrefix.Trim().Trim('/').Trim('\\');
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
@@ -144,7 +156,7 @@ if (!Directory.Exists(uploadPath))
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
-    RequestPath = $"/{uploadFolder}"
+    RequestPath = $"/{publicPathPrefix}"
 });
 
 app.UseAuthentication();
