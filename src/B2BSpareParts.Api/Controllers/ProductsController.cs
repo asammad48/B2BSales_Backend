@@ -45,8 +45,12 @@ public class ProductsController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<ApiResponse<Guid>>> Create([FromForm] CreateProductRequestDto request, [FromForm] List<IFormFile> imageFiles, CancellationToken ct)
     {
-        var uploadFolder = _configuration["FileStorage:UploadFolder"] ?? "uploads";
-        var uploadPath = Path.Combine(_env.ContentRootPath, uploadFolder);
+        var configuredStoragePath = _configuration["FileStorage:StoragePath"]
+            ?? _configuration["FileStorage:UploadFolder"]
+            ?? "uploads";
+        var uploadPath = Path.IsPathRooted(configuredStoragePath)
+            ? configuredStoragePath
+            : Path.GetFullPath(Path.Combine(_env.ContentRootPath, configuredStoragePath));
 
         if (!Directory.Exists(uploadPath))
         {
@@ -71,13 +75,13 @@ public class ProductsController : ControllerBase
                 // If images were already provided in the DTO, update the first matching one or add a new one
                 if (request.Images.Count > i)
                 {
-                    request.Images[i].FilePath = $"{uploadFolder}/{fileName}";
+                    request.Images[i].FilePath = fileName;
                 }
                 else
                 {
                     request.Images.Add(new CreateProductImageRequestDto
                     {
-                        FilePath = $"{uploadFolder}/{fileName}",
+                        FilePath = fileName,
                         IsPrimary = request.Images.Count == 0, // Fallback if no image is marked primary
                         SortOrder = request.Images.Count
                     });

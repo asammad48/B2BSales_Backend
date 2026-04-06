@@ -134,8 +134,17 @@ app.UseExceptionHandler(handler =>
 app.UseCors("AllowAllOrigins");
 app.UseHttpsRedirection();
 
-var uploadFolder = builder.Configuration["FileStorage:UploadFolder"] ?? "uploads";
-var uploadPath = Path.Combine(builder.Environment.ContentRootPath, uploadFolder);
+var configuredStoragePath = builder.Configuration["FileStorage:StoragePath"]
+    ?? builder.Configuration["FileStorage:UploadFolder"]
+    ?? "uploads";
+var uploadPath = Path.IsPathRooted(configuredStoragePath)
+    ? configuredStoragePath
+    : Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, configuredStoragePath));
+
+var publicPathPrefix = builder.Configuration["FileStorage:PublicPathPrefix"]
+    ?? builder.Configuration["FileStorage:UploadFolder"]
+    ?? "uploads";
+publicPathPrefix = publicPathPrefix.Trim().Trim('/').Trim('\\');
 if (!Directory.Exists(uploadPath))
 {
     Directory.CreateDirectory(uploadPath);
@@ -144,7 +153,7 @@ if (!Directory.Exists(uploadPath))
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(uploadPath),
-    RequestPath = $"/{uploadFolder}"
+    RequestPath = $"/{publicPathPrefix}"
 });
 
 app.UseAuthentication();

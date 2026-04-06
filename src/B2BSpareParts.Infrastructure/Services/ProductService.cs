@@ -12,11 +12,15 @@ public class ProductService : IProductService
 {
     private readonly AppDbContext _db;
     private readonly ITenantContext _tenantContext;
+    private readonly string _imagePublicPathPrefix;
 
-    public ProductService(AppDbContext db, ITenantContext tenantContext)
+    public ProductService(AppDbContext db, ITenantContext tenantContext, IConfiguration configuration)
     {
         _db = db;
         _tenantContext = tenantContext;
+        _imagePublicPathPrefix = (configuration["FileStorage:PublicPathPrefix"]
+            ?? configuration["FileStorage:UploadFolder"]
+            ?? "uploads").Trim().Trim('/').Trim('\\');
     }
 
     public async Task<PageResponse<ProductListItemResponseDto>> GetPagedAsync(PageRequest request, CancellationToken ct = default)
@@ -58,7 +62,11 @@ public class ProductService : IProductService
                 QualityType = x.QualityType,
                 DefaultBuyingPrice = isGuestView ? null : x.DefaultBuyingPrice,
                 DefaultSellingPrice = x.DefaultSellingPrice,
-                PrimaryImageUrl = x.Images.Where(i => i.IsPrimary).OrderBy(i => i.SortOrder).Select(i => i.FilePath).FirstOrDefault(),
+                PrimaryImageUrl = x.Images
+                    .Where(i => i.IsPrimary)
+                    .OrderBy(i => i.SortOrder)
+                    .Select(i => $"/{_imagePublicPathPrefix}/{i.FilePath}")
+                    .FirstOrDefault(),
                 QuantityInHand = x.TrackingType == TrackingType.Serializado
                     ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
                     : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
@@ -129,7 +137,7 @@ public class ProductService : IProductService
             Images = product.Images.OrderBy(x => x.SortOrder).Select(x => new ProductImageResponseDto
             {
                 Id = x.Id,
-                FilePath = x.FilePath,
+                FilePath = BuildPublicImagePath(x.FilePath),
                 AltText = x.AltText,
                 IsPrimary = x.IsPrimary
             }).ToList(),
@@ -218,7 +226,7 @@ public class ProductService : IProductService
             Images = request.Images.OrderBy(x => x.SortOrder).Select(x => new ProductImage
             {
                 TenantId = tenantId,
-                FilePath = x.FilePath,
+                FilePath = Path.GetFileName(x.FilePath),
                 AltText = x.AltText,
                 IsPrimary = x.IsPrimary,
                 SortOrder = x.SortOrder
@@ -296,5 +304,11 @@ public class ProductService : IProductService
             MarkupPercentage = product.DefaultMarkupPercentage,
             UpdatedAt = product.UpdatedAt ?? DateTimeOffset.UtcNow
         };
+    }
+
+    private string BuildPublicImagePath(string fileName)
+    {
+        var normalizedFileName = Path.GetFileName(fileName);
+        return $"/{_imagePublicPathPrefix}/{normalizedFileName}";
     }
 }
