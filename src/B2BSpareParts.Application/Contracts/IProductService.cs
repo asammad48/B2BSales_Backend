@@ -9,4 +9,5 @@ public interface IProductService
     Task<ProductDetailResponseDto> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<Guid> CreateAsync(CreateProductRequestDto request, CancellationToken ct = default);
     Task<ProductPricingAdjustmentResultDto> AdjustPricingAsync(Guid productId, AdjustProductPricingRequestDto request, CancellationToken ct = default);
+    Task UpdateFlagsAsync(Guid productId, UpdateProductFlagsRequestDto request, CancellationToken ct = default);
 }

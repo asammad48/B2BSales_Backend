@@ -96,4 +96,11 @@ public class ProductsController : ControllerBase
     [HttpPost("{productId:guid}/pricing/adjust")]
     public async Task<ActionResult<ApiResponse<ProductPricingAdjustmentResultDto>>> AdjustPricing(Guid productId, [FromBody] AdjustProductPricingRequestDto request, CancellationToken ct)
         => Ok(ApiResponse<ProductPricingAdjustmentResultDto>.Ok(await _productService.AdjustPricingAsync(productId, request, ct)));
+
+    [HttpPatch("{productId:guid}/flags")]
+    public async Task<ActionResult<ApiResponse<object>>> UpdateFlags(Guid productId, [FromBody] UpdateProductFlagsRequestDto request, CancellationToken ct)
+    {
+        await _productService.UpdateFlagsAsync(productId, request, ct);
+        return Ok(ApiResponse<object>.Ok(new { Message = "Product flags updated successfully." }));
+    }
 }
