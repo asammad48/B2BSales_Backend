@@ -272,7 +272,7 @@ public class PublicCatalogService : IPublicCatalogService
 
     public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
-        var query = BuildPublicCatalogQuery(request.ShopId)
+        var query = BuildPublicCatalogQuery(request.ShopId, requireInStock: false)
             .Where(x => x.IsNewArrival);
 
         var categoryIds = request.GetCategoryFilterIds();
@@ -312,7 +312,7 @@ public class PublicCatalogService : IPublicCatalogService
         if (!request.ShopId.HasValue || request.ShopId.Value == Guid.Empty)
             throw new AppException("ShopId is required", 400);
 
-        IQueryable<Product> query = BuildPublicCatalogQuery(request.ShopId)
+        IQueryable<Product> query = BuildPublicCatalogQuery(request.ShopId, requireInStock: false)
             .Where(x => x.IsFeatured);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -331,7 +331,7 @@ public class PublicCatalogService : IPublicCatalogService
         return await BuildPublicNewArrivalPageAsync(query.OrderByDescending(x => x.CreatedAt), request, request.ShopId, ct);
     }
 
-    private IQueryable<Product> BuildPublicCatalogQuery(Guid? shopId)
+    private IQueryable<Product> BuildPublicCatalogQuery(Guid? shopId, bool requireInStock = true)
     {
         var tenantId = _tenantContext.TenantId;
         var query = _db.Products
@@ -345,7 +345,7 @@ public class PublicCatalogService : IPublicCatalogService
             .ThenInclude(t => t!.BaseCurrency)
             .Where(x => x.TenantId == tenantId && x.IsActive && !x.IsDeleted);
 
-        if (shopId.HasValue)
+        if (shopId.HasValue && requireInStock)
         {
             query = query.Where(x =>
                 (x.TrackingType == TrackingType.Serializado &&
