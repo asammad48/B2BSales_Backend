@@ -28,6 +28,7 @@ public class Product : TenantEntity
     public bool IsActive { get; set; } = true;
     public bool IsPublicVisible { get; set; }
     public bool IsFeatured { get; set; }
+    public bool IsNewArrival { get; set; }
 
     public Tenant? Tenant { get; set; }
     public Category? Category { get; set; }

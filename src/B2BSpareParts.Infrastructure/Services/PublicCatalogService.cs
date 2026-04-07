@@ -272,7 +272,8 @@ public class PublicCatalogService : IPublicCatalogService
 
     public async Task<PageResponse<PublicNewArrivalProductItemDto>> GetNewArrivalsAsync(GetPublicProductsRequestDto request, CancellationToken ct = default)
     {
-        var query = BuildPublicCatalogQuery(request.ShopId);
+        var query = BuildPublicCatalogQuery(request.ShopId)
+            .Where(x => x.IsNewArrival);
 
         var categoryIds = request.GetCategoryFilterIds();
         if (categoryIds.Count > 0)

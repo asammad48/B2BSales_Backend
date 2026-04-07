@@ -72,6 +72,8 @@ public class ProductService : IProductService
                     ? _db.SerializedInventoryUnits.Count(u => u.TenantId == tenantId && u.ProductId == x.Id && u.Status == SerializedUnitStatus.InStock && !u.IsDeleted)
                     : _db.ShopInventories.Where(i => i.TenantId == tenantId && i.ProductId == x.Id && !i.IsDeleted).Sum(i => i.QuantityOnHand),
                 IsActive = x.IsActive,
+                IsFeatured = x.IsFeatured,
+                IsNewArrival = x.IsNewArrival,
                 IsPriceLocked = isGuestView,
                 CanOrder = !isGuestView
             });
@@ -143,6 +145,8 @@ public class ProductService : IProductService
                 IsPrimary = x.IsPrimary
             }).ToList(),
             RelatedProducts = related,
+            IsFeatured = product.IsFeatured,
+            IsNewArrival = product.IsNewArrival,
             IsPriceLocked = isGuestView,
             CanOrder = !isGuestView,
             AvailabilityMessage = isGuestView ? "Login required to view price and place order." : "Available for approved logged-in clients."
@@ -305,6 +309,20 @@ public class ProductService : IProductService
             MarkupPercentage = product.DefaultMarkupPercentage,
             UpdatedAt = product.UpdatedAt ?? DateTimeOffset.UtcNow
         };
+    }
+
+    public async Task UpdateFlagsAsync(Guid productId, UpdateProductFlagsRequestDto request, CancellationToken ct = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var product = await _db.Products
+            .FirstOrDefaultAsync(x => x.Id == productId && x.TenantId == tenantId && !x.IsDeleted, ct)
+            ?? throw new AppException("Product not found", 404);
+
+        product.IsFeatured = request.IsFeatured;
+        product.IsNewArrival = request.IsNewArrival;
+        product.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
     }
 
     private string BuildPublicImagePath(string fileName)
