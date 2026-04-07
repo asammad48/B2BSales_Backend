@@ -32,5 +32,5 @@ public class CreateClientRequestDto
 
     public bool IsActive { get; set; } = true;
 
-    public ClientStatus Status { get; set; } = ClientStatus.PendingApproval;
+    public ClientStatus Status { get; set; } = ClientStatus.Approved;
 }
